@@ -1,6 +1,6 @@
-name: Linux CI
+name: Linux CI Boost 1.67.0
 
-on: [push, pull_request]
+on: [pull_request]
 
 jobs:
   build:
@@ -20,9 +20,9 @@ jobs:
         # Github Actions requires a single row to be added to the build matrix.
         # See https://help.github.com/en/articles/workflow-syntax-for-github-actions.
         name: [
-          ubuntu-18.04-gcc-5,
+          # ubuntu-18.04-gcc-5,
           ubuntu-18.04-gcc-9,
-          ubuntu-18.04-clang-9,
+          # ubuntu-18.04-clang-9,
         ]
 
         build_type: [Debug, Release]
@@ -78,5 +78,11 @@ jobs:
         run: |
           bash .github/scripts/boost.sh
 
-      - name: Build and Test
+      - name: Build
+        run: bash .github/scripts/unix.sh -b
+
+      - name: Setup tmate debug session
+        uses: mxschmitt/action-tmate@v3
+
+      - name: Test
         run: bash .github/scripts/unix.sh -t

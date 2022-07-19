@@ -32,23 +32,23 @@ jobs:
           # ubuntu-18.04-clang-9,
         ]
 
-        build_type: [Release]
+        build_type: [Debug, Release]
         build_unstable: [ON]
         include:
-          # - name: ubuntu-18.04-gcc-5
-          #   os: ubuntu-18.04
-          #   compiler: gcc
-          #   version: "5"
+          - name: ubuntu-18.04-gcc-5
+            os: ubuntu-18.04
+            compiler: gcc
+            version: "5"
 
           - name: ubuntu-18.04-gcc-9
             os: ubuntu-18.04
             compiler: gcc
             version: "9"
 
-          # - name: ubuntu-18.04-clang-9
-          #   os: ubuntu-18.04
-          #   compiler: clang
-          #   version: "9"
+          - name: ubuntu-18.04-clang-9
+            os: ubuntu-18.04
+            compiler: clang
+            version: "9"
 
     steps:
       - name: Checkout

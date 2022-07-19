@@ -25,6 +25,7 @@
 #include <gtsam/linear/JacobianFactor.h>
 #include <gtsam/inference/Factor.h>
 #include <gtsam/base/OptionalJacobian.h>
+#include <gtsam/base/utilities.h>  // boost::index_sequence
 
 #include <boost/serialization/base_object.hpp>
 #include <boost/assign/list_of.hpp>
@@ -263,512 +264,456 @@ public:
   friend class boost::serialization::access;
   template<class ARCHIVE>
   void serialize(ARCHIVE & ar, const unsigned int /*version*/) {
+    std::cout << "noise model base open " << std::endl;
     ar & boost::serialization::make_nvp("NonlinearFactor",
          boost::serialization::base_object<Base>(*this));
+    std::cout << "noise model itself begin" << std::endl;
     ar & BOOST_SERIALIZATION_NVP(noiseModel_);
+    std::cout << "noise model itself end" << std::endl;
+    std::cout << "noise model base close " << std::endl;
   }
 
 }; // \class NoiseModelFactor
 
 
 /* ************************************************************************* */
-
 /**
- * A convenient base class for creating your own NoiseModelFactor with 1
- * variable.  To derive from this class, implement evaluateError().
+ * A convenient base class for creating your own NoiseModelFactor
+ * with n variables.  To derive from this class, implement evaluateError().
  *
- * Templated on a values structure type. The values structures are typically
- * more general than just vectors, e.g., Rot3 or Pose3,
- * which are objects in non-linear manifolds (Lie groups).
+ * For example, a 2-way factor could be implemented like so:
+ *
+ * ~~~~~~~~~~~~~~~~~~~~{.cpp}
+ * class MyFactor : public NoiseModelFactorN<double, double> {
+ *  public:
+ *   using Base = NoiseModelFactorN<double, double>;
+ *
+ *   MyFactor(Key key1, Key key2, const SharedNoiseModel& noiseModel)
+ *       : Base(noiseModel, key1, key2) {}
+ *
+ *   Vector evaluateError(
+ *       const double& x1, const double& x2,
+ *       boost::optional<Matrix&> H1 = boost::none,
+ *       boost::optional<Matrix&> H2 = boost::none) const override {
+ *     if (H1) *H1 = (Matrix(1, 1) << 1.0).finished();
+ *     if (H2) *H2 = (Matrix(1, 1) << 2.0).finished();
+ *     return (Vector(1) << x1 + 2 * x2).finished();
+ *   }
+ * };
+ * ~~~~~~~~~~~~~~~~~~~~
+ *
+ * These factors are templated on a values structure type. The values structures
+ * are typically more general than just vectors, e.g., Rot3 or Pose3, which are
+ * objects in non-linear manifolds (Lie groups).
  */
-template<class VALUE>
-class NoiseModelFactor1: public NoiseModelFactor {
+template <class... VALUES>
+class NoiseModelFactorN : public NoiseModelFactor {
+ public:
+  /// N is the number of variables (N-way factor)
+  enum { N = sizeof...(VALUES) };
 
-public:
+  /** The type of the i'th template param can be obtained as X<I> */
+  template <int I, typename std::enable_if<(I < N), bool>::type = true>
+  using X = typename std::tuple_element<I, std::tuple<VALUES...>>::type;
 
-  // typedefs for value types pulled from keys
-  typedef VALUE X;
+ protected:
+  using Base = NoiseModelFactor;
+  using This = NoiseModelFactorN<VALUES...>;
 
-protected:
+  /* Like std::void_t, except produces `boost::optional<Matrix&>` instead. Used
+   * to expand fixed-type parameter-packs with same length as VALUES */
+  template <typename T>
+  using optional_matrix_type = boost::optional<Matrix&>;
 
-  typedef NoiseModelFactor Base;
-  typedef NoiseModelFactor1<VALUE> This;
+  /* Like std::void_t, except produces `Key` instead. Used to expand fixed-type
+   * parameter-packs with same length as VALUES */
+  template <typename T>
+  using key_type = Key;
 
-public:
+ public:
   /// @name Constructors
   /// @{
 
-  /** Default constructor for I/O only */
-  NoiseModelFactor1() {}
-
-  ~NoiseModelFactor1() override {}
-
-  inline Key key() const { return keys_[0]; }
+  /**
+   * Default Constructor for I/O
+   */
+  NoiseModelFactorN() {}
 
   /**
-   *  Constructor
-   *  @param noiseModel shared pointer to noise model
-   *  @param key1 by which to look up X value in Values
+   * Constructor.
+   * Example usage: NoiseModelFactorN(noise, key1, key2, ..., keyN)
+   * @param noiseModel Shared pointer to noise model.
+   * @param keys Keys for the variables in this factor, passed in as separate
+   * arguments.
    */
-  NoiseModelFactor1(const SharedNoiseModel &noiseModel, Key key1)
-      : Base(noiseModel, cref_list_of<1>(key1)) {}
+  NoiseModelFactorN(const SharedNoiseModel& noiseModel,
+                    key_type<VALUES>... keys)
+      : Base(noiseModel, std::array<Key, N>{keys...}) {}
+
+  /**
+   * Constructor.  Only enabled for n-ary factors where n > 1.
+   * @param noiseModel Shared pointer to noise model.
+   * @param keys A container of keys for the variables in this factor.
+   */
+  template <typename CONTAINER,  // use "dummy" parameter T to delay deduction
+            size_t T = N, typename std::enable_if<(T > 1), bool>::type = true>
+  NoiseModelFactorN(const SharedNoiseModel& noiseModel, CONTAINER keys)
+      : Base(noiseModel, keys) {
+    assert(keys.size() == N);
+  }
 
   /// @}
+
+  ~NoiseModelFactorN() override {}
+
+  /** Returns a key. Usage: `key<I>()` returns the I'th key. */
+  template <int I>
+  inline typename std::enable_if<(I < N), Key>::type key() const {
+    return keys_[I];
+  }
+
   /// @name NoiseModelFactor methods
   /// @{
 
-  /**
-   * Calls the 1-key specific version of evaluateError below, which is pure
-   * virtual so must be implemented in the derived class.
+  /** Calls the n-key specific version of evaluateError, which is pure virtual
+   * so must be implemented in the derived class.
+   * @param[in] x A Values object containing the values of all the variables
+   * used in this factor
+   * @param[out] H A vector of (dynamic) matrices whose size should be equal to
+   * n.  The jacobians w.r.t. each variable will be output in this parameter.
    */
   Vector unwhitenedError(
-      const Values &x,
-      boost::optional<std::vector<Matrix> &> H = boost::none) const override {
-    if (this->active(x)) {
-      const X &x1 = x.at<X>(keys_[0]);
-      if (H) {
-        return evaluateError(x1, (*H)[0]);
-      } else {
-        return evaluateError(x1);
-      }
-    } else {
-      return Vector::Zero(this->dim());
-    }
+      const Values& x,
+      boost::optional<std::vector<Matrix>&> H = boost::none) const override {
+    return unwhitenedError(boost::mp11::index_sequence_for<VALUES...>{}, x, H);
   }
 
   /// @}
   /// @name Virtual methods
   /// @{
-
   /**
-   *  Override this method to finish implementing a unary factor.
-   *  If the optional Matrix reference argument is specified, it should compute
-   *  both the function evaluation and its derivative in X.
+   *  Override this method to finish implementing an n-way factor.
+   *
+   *  Both the `x` and `H` arguments are written here as parameter packs, but
+   * when overriding this method, you probably want to explicitly write them
+   * out.  For example, for a 2-way factor with variable types Pose3 and double:
+   * ```
+   * Vector evaluateError(const Pose3& x1, const double& x2,
+   *                      boost::optional<Matrix&> H1 = boost::none,
+   *                      boost::optional<Matrix&> H2 = boost::none) const
+   * override {...}
+   * ```
+   *
+   *  If any of the optional Matrix reference arguments are specified, it should
+   * compute both the function evaluation and its derivative(s) in the requested
+   * variables.
+   *
+   * @param x The values of the variables to evaluate the error for.  Passed in
+   * as separate arguments.
+   * @param[out] H The Jacobian with respect to each variable (optional).
    */
-  virtual Vector
-  evaluateError(const X &x,
-                boost::optional<Matrix &> H = boost::none) const = 0;
+  virtual Vector evaluateError(const VALUES&... x,
+                               optional_matrix_type<VALUES>... H) const = 0;
+
+  /// @}
+  /// @name Convenience method overloads
+  /// @{
+
+  /** No-jacobians requested function overload (since parameter packs can't have
+   * default args).  This specializes the version below to avoid recursive calls
+   * since this is commonly used.
+   *
+   * e.g. `Vector error = factor.evaluateError(x1, x2, x3);`
+   */
+  inline Vector evaluateError(const VALUES&... x) const {
+    return evaluateError(x..., optional_matrix_type<VALUES>()...);
+  }
+
+  /** Some optional jacobians omitted function overload */
+  template <typename... OptionalJacArgs,
+            typename std::enable_if<(sizeof...(OptionalJacArgs) > 0) &&
+                                        (sizeof...(OptionalJacArgs) < N),
+                                    bool>::type = true>
+  inline Vector evaluateError(const VALUES&... x,
+                              OptionalJacArgs&&... H) const {
+    return evaluateError(x..., std::forward<OptionalJacArgs>(H)...,
+                         boost::none);
+  }
 
   /// @}
 
-private:
-  /** Serialization function */
-  friend class boost::serialization::access;
-  template<class ARCHIVE>
-  void serialize(ARCHIVE & ar, const unsigned int /*version*/) {
-    ar & boost::serialization::make_nvp("NoiseModelFactor",
-        boost::serialization::base_object<Base>(*this));
-  }
-};// \class NoiseModelFactor1
-
-
-/* ************************************************************************* */
-/** A convenient base class for creating your own NoiseModelFactor with 2
- * variables.  To derive from this class, implement evaluateError(). */
-template<class VALUE1, class VALUE2>
-class NoiseModelFactor2: public NoiseModelFactor {
-
-public:
-
-  // typedefs for value types pulled from keys
-  typedef VALUE1 X1;
-  typedef VALUE2 X2;
-
-protected:
-
-  typedef NoiseModelFactor Base;
-  typedef NoiseModelFactor2<VALUE1, VALUE2> This;
-
-public:
-
-  /**
-   * Default Constructor for I/O
+ private:
+  /** Pack expansion with index_sequence template pattern, used to index into
+   * `keys_` and `H`
    */
-  NoiseModelFactor2() {}
-
-  /**
-   * Constructor
-   * @param noiseModel shared pointer to noise model
-   * @param j1 key of the first variable
-   * @param j2 key of the second variable
-   */
-  NoiseModelFactor2(const SharedNoiseModel& noiseModel, Key j1, Key j2) :
-    Base(noiseModel, cref_list_of<2>(j1)(j2)) {}
-
-  ~NoiseModelFactor2() override {}
-
-  /** methods to retrieve both keys */
-  inline Key key1() const { return keys_[0];  }
-  inline Key key2() const {  return keys_[1];  }
-
-  /** Calls the 2-key specific version of evaluateError, which is pure virtual
-   * so must be implemented in the derived class. */
-  Vector unwhitenedError(const Values& x, boost::optional<std::vector<Matrix>&> H = boost::none) const override {
-    if(this->active(x)) {
-      const X1& x1 = x.at<X1>(keys_[0]);
-      const X2& x2 = x.at<X2>(keys_[1]);
-      if(H) {
-        return evaluateError(x1, x2, (*H)[0], (*H)[1]);
+  template <std::size_t... Inds>
+  inline Vector unwhitenedError(
+      boost::mp11::index_sequence<Inds...>,  //
+      const Values& x,
+      boost::optional<std::vector<Matrix>&> H = boost::none) const {
+    if (this->active(x)) {
+      if (H) {
+        return evaluateError(x.at<VALUES>(keys_[Inds])..., (*H)[Inds]...);
       } else {
-        return evaluateError(x1, x2);
+        return evaluateError(x.at<VALUES>(keys_[Inds])...);
       }
     } else {
       return Vector::Zero(this->dim());
     }
   }
 
-  /**
-   *  Override this method to finish implementing a binary factor.
-   *  If any of the optional Matrix reference arguments are specified, it should compute
-   *  both the function evaluation and its derivative(s) in X1 (and/or X2).
-   */
-  virtual Vector
-  evaluateError(const X1&, const X2&, boost::optional<Matrix&> H1 =
-      boost::none, boost::optional<Matrix&> H2 = boost::none) const = 0;
-
-private:
-
   /** Serialization function */
   friend class boost::serialization::access;
-  template<class ARCHIVE>
-  void serialize(ARCHIVE & ar, const unsigned int /*version*/) {
-    ar & boost::serialization::make_nvp("NoiseModelFactor",
-        boost::serialization::base_object<Base>(*this));
+  template <class ARCHIVE>
+  void serialize(ARCHIVE& ar, const unsigned int /*version*/) {
+    std::cout << "checkpoint N open" << std::endl;
+    ar& boost::serialization::make_nvp(
+        "NoiseModelFactor", boost::serialization::base_object<Base>(*this));
+    std::cout << "checkpoint N close" << std::endl;
   }
-}; // \class NoiseModelFactor2
+};  // \class NoiseModelFactorN
 
 /* ************************************************************************* */
-/** A convenient base class for creating your own NoiseModelFactor with 3
- * variables.  To derive from this class, implement evaluateError(). */
-template<class VALUE1, class VALUE2, class VALUE3>
-class NoiseModelFactor3: public NoiseModelFactor {
+/** @deprecated: use NoiseModelFactorN, replacing .key() with .key<1> and X1
+ * with X<1>.
+ * A convenient base class for creating your own NoiseModelFactor
+ * with 1 variable.  To derive from this class, implement evaluateError().
+ */
+template <class VALUE>
+class NoiseModelFactor1 : public NoiseModelFactorN<VALUE> {
+ public:
+  // aliases for value types pulled from keys
+  using X = VALUE;
 
-public:
+ protected:
+  using Base = NoiseModelFactor;  // grandparent, for backwards compatibility
+  using This = NoiseModelFactor1<VALUE>;
 
-  // typedefs for value types pulled from keys
-  typedef VALUE1 X1;
-  typedef VALUE2 X2;
-  typedef VALUE3 X3;
+ public:
+  // inherit NoiseModelFactorN's constructors
+  using NoiseModelFactorN<VALUE>::NoiseModelFactorN;
+  ~NoiseModelFactor1() override {}
 
-protected:
+  /** method to retrieve key */
+  inline Key key() const { return this->keys_[0]; }
 
-  typedef NoiseModelFactor Base;
-  typedef NoiseModelFactor3<VALUE1, VALUE2, VALUE3> This;
+ private:
+  /** Serialization function */
+  friend class boost::serialization::access;
+  template <class ARCHIVE>
+  void serialize(ARCHIVE& ar, const unsigned int /*version*/) {
+    std::cout << "checkpoint a open " << std::endl;
+    ar& boost::serialization::make_nvp(
+        "NoiseModelFactor", boost::serialization::base_object<Base>(*this));
+    std::cout << "checkpoint a close" << std::endl;
+  }
+};  // \class NoiseModelFactor1
 
-public:
+/* ************************************************************************* */
+/** @deprecated: use NoiseModelFactorN, replacing .key1() with .key<1> and X1
+ * with X<1>.
+ * A convenient base class for creating your own NoiseModelFactor
+ * with 2 variables.  To derive from this class, implement evaluateError().
+ */
+template <class VALUE1, class VALUE2>
+class NoiseModelFactor2 : public NoiseModelFactorN<VALUE1, VALUE2> {
+ public:
+  // aliases for value types pulled from keys
+  using X1 = VALUE1;
+  using X2 = VALUE2;
 
-  /**
-   * Default Constructor for I/O
-   */
-  NoiseModelFactor3() {}
+ protected:
+  using Base = NoiseModelFactor;
+  using This = NoiseModelFactor2<VALUE1, VALUE2>;
 
-  /**
-   * Constructor
-   * @param noiseModel shared pointer to noise model
-   * @param j1 key of the first variable
-   * @param j2 key of the second variable
-   * @param j3 key of the third variable
-   */
-  NoiseModelFactor3(const SharedNoiseModel& noiseModel, Key j1, Key j2, Key j3) :
-    Base(noiseModel, cref_list_of<3>(j1)(j2)(j3)) {}
+ public:
+  // inherit NoiseModelFactorN's constructors
+  using NoiseModelFactorN<VALUE1, VALUE2>::NoiseModelFactorN;
+  ~NoiseModelFactor2() override {}
 
+  /** methods to retrieve both keys */
+  inline Key key1() const { return this->keys_[0]; }
+  inline Key key2() const { return this->keys_[1]; }
+
+ private:
+  /** Serialization function */
+  friend class boost::serialization::access;
+  template <class ARCHIVE>
+  void serialize(ARCHIVE& ar, const unsigned int /*version*/) {
+    ar& boost::serialization::make_nvp(
+        "NoiseModelFactor", boost::serialization::base_object<Base>(*this));
+  }
+};  // \class NoiseModelFactor2
+
+/* ************************************************************************* */
+/** @deprecated: use NoiseModelFactorN, replacing .key1() with .key<1> and X1
+ * with X<1>.
+ * A convenient base class for creating your own NoiseModelFactor
+ * with 3 variables.  To derive from this class, implement evaluateError().
+ */
+template <class VALUE1, class VALUE2, class VALUE3>
+class NoiseModelFactor3 : public NoiseModelFactorN<VALUE1, VALUE2, VALUE3> {
+ public:
+  // aliases for value types pulled from keys
+  using X1 = VALUE1;
+  using X2 = VALUE2;
+  using X3 = VALUE3;
+
+ protected:
+  using Base = NoiseModelFactor;
+  using This = NoiseModelFactor3<VALUE1, VALUE2, VALUE3>;
+
+ public:
+  // inherit NoiseModelFactorN's constructors
+  using NoiseModelFactorN<VALUE1, VALUE2, VALUE3>::NoiseModelFactorN;
   ~NoiseModelFactor3() override {}
 
   /** methods to retrieve keys */
-  inline Key key1() const { return keys_[0]; }
-  inline Key key2() const { return keys_[1]; }
-  inline Key key3() const { return keys_[2]; }
+  inline Key key1() const { return this->keys_[0]; }
+  inline Key key2() const { return this->keys_[1]; }
+  inline Key key3() const { return this->keys_[2]; }
 
-  /** Calls the 3-key specific version of evaluateError, which is pure virtual
-   * so must be implemented in the derived class. */
-  Vector unwhitenedError(const Values& x, boost::optional<std::vector<Matrix>&> H = boost::none) const override {
-    if(this->active(x)) {
-      if(H)
-        return evaluateError(x.at<X1>(keys_[0]), x.at<X2>(keys_[1]), x.at<X3>(keys_[2]), (*H)[0], (*H)[1], (*H)[2]);
-      else
-        return evaluateError(x.at<X1>(keys_[0]), x.at<X2>(keys_[1]), x.at<X3>(keys_[2]));
-    } else {
-      return Vector::Zero(this->dim());
-    }
-  }
-
-  /**
-   *  Override this method to finish implementing a trinary factor.
-   *  If any of the optional Matrix reference arguments are specified, it should compute
-   *  both the function evaluation and its derivative(s) in X1 (and/or X2, X3).
-   */
-  virtual Vector
-  evaluateError(const X1&, const X2&, const X3&,
-      boost::optional<Matrix&> H1 = boost::none,
-      boost::optional<Matrix&> H2 = boost::none,
-      boost::optional<Matrix&> H3 = boost::none) const = 0;
-
-private:
-
+ private:
   /** Serialization function */
   friend class boost::serialization::access;
-  template<class ARCHIVE>
-  void serialize(ARCHIVE & ar, const unsigned int /*version*/) {
-    ar & boost::serialization::make_nvp("NoiseModelFactor",
-        boost::serialization::base_object<Base>(*this));
+  template <class ARCHIVE>
+  void serialize(ARCHIVE& ar, const unsigned int /*version*/) {
+    ar& boost::serialization::make_nvp(
+        "NoiseModelFactor", boost::serialization::base_object<Base>(*this));
   }
-}; // \class NoiseModelFactor3
+};  // \class NoiseModelFactor3
 
 /* ************************************************************************* */
-/** A convenient base class for creating your own NoiseModelFactor with 4
- * variables.  To derive from this class, implement evaluateError(). */
-template<class VALUE1, class VALUE2, class VALUE3, class VALUE4>
-class NoiseModelFactor4: public NoiseModelFactor {
+/** @deprecated: use NoiseModelFactorN, replacing .key1() with .key<1> and X1
+ * with X<1>.
+ * A convenient base class for creating your own NoiseModelFactor
+ * with 4 variables.  To derive from this class, implement evaluateError().
+ */
+template <class VALUE1, class VALUE2, class VALUE3, class VALUE4>
+class NoiseModelFactor4
+    : public NoiseModelFactorN<VALUE1, VALUE2, VALUE3, VALUE4> {
+ public:
+  // aliases for value types pulled from keys
+  using X1 = VALUE1;
+  using X2 = VALUE2;
+  using X3 = VALUE3;
+  using X4 = VALUE4;
 
-public:
+ protected:
+  using Base = NoiseModelFactor;
+  using This = NoiseModelFactor4<VALUE1, VALUE2, VALUE3, VALUE4>;
 
-  // typedefs for value types pulled from keys
-  typedef VALUE1 X1;
-  typedef VALUE2 X2;
-  typedef VALUE3 X3;
-  typedef VALUE4 X4;
-
-protected:
-
-  typedef NoiseModelFactor Base;
-  typedef NoiseModelFactor4<VALUE1, VALUE2, VALUE3, VALUE4> This;
-
-public:
-
-  /**
-   * Default Constructor for I/O
-   */
-  NoiseModelFactor4() {}
-
-  /**
-   * Constructor
-   * @param noiseModel shared pointer to noise model
-   * @param j1 key of the first variable
-   * @param j2 key of the second variable
-   * @param j3 key of the third variable
-   * @param j4 key of the fourth variable
-   */
-  NoiseModelFactor4(const SharedNoiseModel& noiseModel, Key j1, Key j2, Key j3, Key j4) :
-    Base(noiseModel, cref_list_of<4>(j1)(j2)(j3)(j4)) {}
-
+ public:
+  // inherit NoiseModelFactorN's constructors
+  using NoiseModelFactorN<VALUE1, VALUE2, VALUE3, VALUE4>::NoiseModelFactorN;
   ~NoiseModelFactor4() override {}
 
   /** methods to retrieve keys */
-  inline Key key1() const { return keys_[0]; }
-  inline Key key2() const { return keys_[1]; }
-  inline Key key3() const { return keys_[2]; }
-  inline Key key4() const { return keys_[3]; }
+  inline Key key1() const { return this->keys_[0]; }
+  inline Key key2() const { return this->keys_[1]; }
+  inline Key key3() const { return this->keys_[2]; }
+  inline Key key4() const { return this->keys_[3]; }
 
-  /** Calls the 4-key specific version of evaluateError, which is pure virtual
-   * so must be implemented in the derived class. */
-  Vector unwhitenedError(const Values& x, boost::optional<std::vector<Matrix>&> H = boost::none) const override {
-    if(this->active(x)) {
-      if(H)
-        return evaluateError(x.at<X1>(keys_[0]), x.at<X2>(keys_[1]), x.at<X3>(keys_[2]), x.at<X4>(keys_[3]), (*H)[0], (*H)[1], (*H)[2], (*H)[3]);
-      else
-        return evaluateError(x.at<X1>(keys_[0]), x.at<X2>(keys_[1]), x.at<X3>(keys_[2]), x.at<X4>(keys_[3]));
-    } else {
-      return Vector::Zero(this->dim());
-    }
-  }
-
-  /**
-   *  Override this method to finish implementing a 4-way factor.
-   *  If any of the optional Matrix reference arguments are specified, it should compute
-   *  both the function evaluation and its derivative(s) in X1 (and/or X2, X3).
-   */
-  virtual Vector
-  evaluateError(const X1&, const X2&, const X3&, const X4&,
-      boost::optional<Matrix&> H1 = boost::none,
-      boost::optional<Matrix&> H2 = boost::none,
-      boost::optional<Matrix&> H3 = boost::none,
-      boost::optional<Matrix&> H4 = boost::none) const = 0;
-
-private:
-
+ private:
   /** Serialization function */
   friend class boost::serialization::access;
-  template<class ARCHIVE>
-  void serialize(ARCHIVE & ar, const unsigned int /*version*/) {
-    ar & boost::serialization::make_nvp("NoiseModelFactor",
-        boost::serialization::base_object<Base>(*this));
+  template <class ARCHIVE>
+  void serialize(ARCHIVE& ar, const unsigned int /*version*/) {
+    ar& boost::serialization::make_nvp(
+        "NoiseModelFactor", boost::serialization::base_object<Base>(*this));
   }
-}; // \class NoiseModelFactor4
+};  // \class NoiseModelFactor4
 
 /* ************************************************************************* */
-/** A convenient base class for creating your own NoiseModelFactor with 5
- * variables.  To derive from this class, implement evaluateError(). */
-template<class VALUE1, class VALUE2, class VALUE3, class VALUE4, class VALUE5>
-class NoiseModelFactor5: public NoiseModelFactor {
+/** @deprecated: use NoiseModelFactorN, replacing .key1() with .key<1> and X1
+ * with X<1>.
+ * A convenient base class for creating your own NoiseModelFactor
+ * with 5 variables.  To derive from this class, implement evaluateError().
+ */
+template <class VALUE1, class VALUE2, class VALUE3, class VALUE4, class VALUE5>
+class NoiseModelFactor5
+    : public NoiseModelFactorN<VALUE1, VALUE2, VALUE3, VALUE4, VALUE5> {
+ public:
+  // aliases for value types pulled from keys
+  using X1 = VALUE1;
+  using X2 = VALUE2;
+  using X3 = VALUE3;
+  using X4 = VALUE4;
+  using X5 = VALUE5;
 
-public:
+ protected:
+  using Base = NoiseModelFactor;
+  using This = NoiseModelFactor5<VALUE1, VALUE2, VALUE3, VALUE4, VALUE5>;
 
-  // typedefs for value types pulled from keys
-  typedef VALUE1 X1;
-  typedef VALUE2 X2;
-  typedef VALUE3 X3;
-  typedef VALUE4 X4;
-  typedef VALUE5 X5;
-
-protected:
-
-  typedef NoiseModelFactor Base;
-  typedef NoiseModelFactor5<VALUE1, VALUE2, VALUE3, VALUE4, VALUE5> This;
-
-public:
-
-  /**
-   * Default Constructor for I/O
-   */
-  NoiseModelFactor5() {}
-
-  /**
-   * Constructor
-   * @param noiseModel shared pointer to noise model
-   * @param j1 key of the first variable
-   * @param j2 key of the second variable
-   * @param j3 key of the third variable
-   * @param j4 key of the fourth variable
-   * @param j5 key of the fifth variable
-   */
-  NoiseModelFactor5(const SharedNoiseModel& noiseModel, Key j1, Key j2, Key j3, Key j4, Key j5) :
-    Base(noiseModel, cref_list_of<5>(j1)(j2)(j3)(j4)(j5)) {}
-
+ public:
+  // inherit NoiseModelFactorN's constructors
+  using NoiseModelFactorN<VALUE1, VALUE2, VALUE3, VALUE4,
+                          VALUE5>::NoiseModelFactorN;
   ~NoiseModelFactor5() override {}
 
   /** methods to retrieve keys */
-  inline Key key1() const { return keys_[0]; }
-  inline Key key2() const { return keys_[1]; }
-  inline Key key3() const { return keys_[2]; }
-  inline Key key4() const { return keys_[3]; }
-  inline Key key5() const { return keys_[4]; }
+  inline Key key1() const { return this->keys_[0]; }
+  inline Key key2() const { return this->keys_[1]; }
+  inline Key key3() const { return this->keys_[2]; }
+  inline Key key4() const { return this->keys_[3]; }
+  inline Key key5() const { return this->keys_[4]; }
 
-  /** Calls the 5-key specific version of evaluateError, which is pure virtual
-   * so must be implemented in the derived class. */
-  Vector unwhitenedError(const Values& x, boost::optional<std::vector<Matrix>&> H = boost::none) const override {
-    if(this->active(x)) {
-      if(H)
-        return evaluateError(x.at<X1>(keys_[0]), x.at<X2>(keys_[1]), x.at<X3>(keys_[2]), x.at<X4>(keys_[3]), x.at<X5>(keys_[4]), (*H)[0], (*H)[1], (*H)[2], (*H)[3], (*H)[4]);
-      else
-        return evaluateError(x.at<X1>(keys_[0]), x.at<X2>(keys_[1]), x.at<X3>(keys_[2]), x.at<X4>(keys_[3]), x.at<X5>(keys_[4]));
-    } else {
-      return Vector::Zero(this->dim());
-    }
-  }
-
-  /**
-   *  Override this method to finish implementing a 5-way factor.
-   *  If any of the optional Matrix reference arguments are specified, it should compute
-   *  both the function evaluation and its derivative(s) in X1 (and/or X2, X3).
-   */
-  virtual Vector
-  evaluateError(const X1&, const X2&, const X3&, const X4&, const X5&,
-      boost::optional<Matrix&> H1 = boost::none,
-      boost::optional<Matrix&> H2 = boost::none,
-      boost::optional<Matrix&> H3 = boost::none,
-      boost::optional<Matrix&> H4 = boost::none,
-      boost::optional<Matrix&> H5 = boost::none) const = 0;
-
-private:
-
+ private:
   /** Serialization function */
   friend class boost::serialization::access;
-  template<class ARCHIVE>
-  void serialize(ARCHIVE & ar, const unsigned int /*version*/) {
-    ar & boost::serialization::make_nvp("NoiseModelFactor",
-        boost::serialization::base_object<Base>(*this));
+  template <class ARCHIVE>
+  void serialize(ARCHIVE& ar, const unsigned int /*version*/) {
+    ar& boost::serialization::make_nvp(
+        "NoiseModelFactor", boost::serialization::base_object<Base>(*this));
   }
-}; // \class NoiseModelFactor5
+};  // \class NoiseModelFactor5
 
 /* ************************************************************************* */
-/** A convenient base class for creating your own NoiseModelFactor with 6
- * variables.  To derive from this class, implement evaluateError(). */
-template<class VALUE1, class VALUE2, class VALUE3, class VALUE4, class VALUE5, class VALUE6>
-class NoiseModelFactor6: public NoiseModelFactor {
+/** @deprecated: use NoiseModelFactorN, replacing .key1() with .key<1> and X1
+ * with X<1>.
+ * A convenient base class for creating your own NoiseModelFactor
+ * with 6 variables.  To derive from this class, implement evaluateError().
+ */
+template <class VALUE1, class VALUE2, class VALUE3, class VALUE4, class VALUE5,
+          class VALUE6>
+class NoiseModelFactor6
+    : public NoiseModelFactorN<VALUE1, VALUE2, VALUE3, VALUE4, VALUE5, VALUE6> {
+ public:
+  // aliases for value types pulled from keys
+  using X1 = VALUE1;
+  using X2 = VALUE2;
+  using X3 = VALUE3;
+  using X4 = VALUE4;
+  using X5 = VALUE5;
+  using X6 = VALUE6;
 
-public:
+ protected:
+  using Base = NoiseModelFactor;
+  using This =
+      NoiseModelFactor6<VALUE1, VALUE2, VALUE3, VALUE4, VALUE5, VALUE6>;
 
-  // typedefs for value types pulled from keys
-  typedef VALUE1 X1;
-  typedef VALUE2 X2;
-  typedef VALUE3 X3;
-  typedef VALUE4 X4;
-  typedef VALUE5 X5;
-  typedef VALUE6 X6;
-
-protected:
-
-  typedef NoiseModelFactor Base;
-  typedef NoiseModelFactor6<VALUE1, VALUE2, VALUE3, VALUE4, VALUE5, VALUE6> This;
-
-public:
-
-  /**
-   * Default Constructor for I/O
-   */
-  NoiseModelFactor6() {}
-
-  /**
-   * Constructor
-   * @param noiseModel shared pointer to noise model
-   * @param j1 key of the first variable
-   * @param j2 key of the second variable
-   * @param j3 key of the third variable
-   * @param j4 key of the fourth variable
-   * @param j5 key of the fifth variable
-   * @param j6 key of the fifth variable
-   */
-  NoiseModelFactor6(const SharedNoiseModel& noiseModel, Key j1, Key j2, Key j3, Key j4, Key j5, Key j6) :
-    Base(noiseModel, cref_list_of<6>(j1)(j2)(j3)(j4)(j5)(j6)) {}
-
+ public:
+  // inherit NoiseModelFactorN's constructors
+  using NoiseModelFactorN<VALUE1, VALUE2, VALUE3, VALUE4, VALUE5,
+                          VALUE6>::NoiseModelFactorN;
   ~NoiseModelFactor6() override {}
 
   /** methods to retrieve keys */
-  inline Key key1() const { return keys_[0]; }
-  inline Key key2() const { return keys_[1]; }
-  inline Key key3() const { return keys_[2]; }
-  inline Key key4() const { return keys_[3]; }
-  inline Key key5() const { return keys_[4]; }
-  inline Key key6() const { return keys_[5]; }
+  inline Key key1() const { return this->keys_[0]; }
+  inline Key key2() const { return this->keys_[1]; }
+  inline Key key3() const { return this->keys_[2]; }
+  inline Key key4() const { return this->keys_[3]; }
+  inline Key key5() const { return this->keys_[4]; }
+  inline Key key6() const { return this->keys_[5]; }
 
-  /** Calls the 6-key specific version of evaluateError, which is pure virtual
-   * so must be implemented in the derived class. */
-  Vector unwhitenedError(const Values& x, boost::optional<std::vector<Matrix>&> H = boost::none) const override {
-    if(this->active(x)) {
-      if(H)
-        return evaluateError(x.at<X1>(keys_[0]), x.at<X2>(keys_[1]), x.at<X3>(keys_[2]), x.at<X4>(keys_[3]), x.at<X5>(keys_[4]), x.at<X6>(keys_[5]), (*H)[0], (*H)[1], (*H)[2], (*H)[3], (*H)[4], (*H)[5]);
-      else
-        return evaluateError(x.at<X1>(keys_[0]), x.at<X2>(keys_[1]), x.at<X3>(keys_[2]), x.at<X4>(keys_[3]), x.at<X5>(keys_[4]), x.at<X6>(keys_[5]));
-    } else {
-      return Vector::Zero(this->dim());
-    }
-  }
-
-  /**
-   *  Override this method to finish implementing a 6-way factor.
-   *  If any of the optional Matrix reference arguments are specified, it should compute
-   *  both the function evaluation and its derivative(s) in X1 (and/or X2, X3).
-   */
-  virtual Vector
-  evaluateError(const X1&, const X2&, const X3&, const X4&, const X5&, const X6&,
-      boost::optional<Matrix&> H1 = boost::none,
-      boost::optional<Matrix&> H2 = boost::none,
-      boost::optional<Matrix&> H3 = boost::none,
-      boost::optional<Matrix&> H4 = boost::none,
-      boost::optional<Matrix&> H5 = boost::none,
-      boost::optional<Matrix&> H6 = boost::none) const = 0;
-
-private:
-
+ private:
   /** Serialization function */
   friend class boost::serialization::access;
-  template<class ARCHIVE>
-  void serialize(ARCHIVE & ar, const unsigned int /*version*/) {
-    ar & boost::serialization::make_nvp("NoiseModelFactor",
-        boost::serialization::base_object<Base>(*this));
+  template <class ARCHIVE>
+  void serialize(ARCHIVE& ar, const unsigned int /*version*/) {
+    ar& boost::serialization::make_nvp(
+        "NoiseModelFactor", boost::serialization::base_object<Base>(*this));
   }
-}; // \class NoiseModelFactor6
-
-/* ************************************************************************* */
+};  // \class NoiseModelFactor6
 
 } // \namespace gtsam

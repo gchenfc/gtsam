@@ -330,10 +330,61 @@ TEST( NonlinearFactor, cloneWithNewNoiseModel )
 }
 
 /* ************************************************************************* */
+class TestFactor1 : public NoiseModelFactor1<double> {
+  static_assert(std::is_same<Base, NoiseModelFactor>::value, "Base type wrong");
+  static_assert(std::is_same<This, NoiseModelFactor1<double>>::value,
+                "This type wrong");
+
+ public:
+  typedef NoiseModelFactor1<double> Base;
+  TestFactor1() : Base(noiseModel::Diagonal::Sigmas(Vector1(2.0)), L(1)) {}
+
+  Vector evaluateError(const double& x1, boost::optional<Matrix&> H1 =
+                                             boost::none) const override {
+    if (H1) *H1 = (Matrix(1, 1) << 1.0).finished();
+    return (Vector(1) << x1).finished();
+  }
+
+  gtsam::NonlinearFactor::shared_ptr clone() const override {
+    return boost::static_pointer_cast<gtsam::NonlinearFactor>(
+        gtsam::NonlinearFactor::shared_ptr(new TestFactor1(*this)));
+  }
+};
+
+/* ************************************ */
+TEST(NonlinearFactor, NoiseModelFactor1) {
+  TestFactor1 tf;
+  Values tv;
+  tv.insert(L(1), double((1.0)));
+  EXPECT(assert_equal((Vector(1) << 1.0).finished(), tf.unwhitenedError(tv)));
+  DOUBLES_EQUAL(0.25 / 2.0, tf.error(tv), 1e-9);
+  JacobianFactor jf(
+      *boost::dynamic_pointer_cast<JacobianFactor>(tf.linearize(tv)));
+  LONGS_EQUAL((long)L(1), (long)jf.keys()[0]);
+  EXPECT(assert_equal((Matrix)(Matrix(1, 1) << 0.5).finished(),
+                      jf.getA(jf.begin())));
+  EXPECT(assert_equal((Vector)(Vector(1) << -0.5).finished(), jf.getb()));
+
+  // Test all functions/types for backwards compatibility
+  static_assert(std::is_same<TestFactor1::X, double>::value,
+                "X type incorrect");
+  EXPECT(assert_equal(tf.key(), L(1)));
+  std::vector<Matrix> H = {Matrix()};
+  EXPECT(assert_equal(Vector1(1.0), tf.unwhitenedError(tv, H)));
+}
+
+/* ************************************************************************* */
 class TestFactor4 : public NoiseModelFactor4<double, double, double, double> {
-public:
+  static_assert(std::is_same<Base, NoiseModelFactor>::value, "Base type wrong");
+  static_assert(
+      std::is_same<This,
+                   NoiseModelFactor4<double, double, double, double>>::value,
+      "This type wrong");
+
+ public:
+  static constexpr auto X_ = symbol_shorthand::X;  // collision with X<1>
   typedef NoiseModelFactor4<double, double, double, double> Base;
-  TestFactor4() : Base(noiseModel::Diagonal::Sigmas((Vector(1) << 2.0).finished()), X(1), X(2), X(3), X(4)) {}
+  TestFactor4() : Base(noiseModel::Diagonal::Sigmas((Vector(1) << 2.0).finished()), X_(1), X_(2), X_(3), X_(4)) {}
 
   Vector
     evaluateError(const double& x1, const double& x2, const double& x3, const double& x4,
@@ -375,13 +426,30 @@ TEST(NonlinearFactor, NoiseModelFactor4) {
   EXPECT(assert_equal((Matrix)(Matrix(1, 1) << 1.5).finished(), jf.getA(jf.begin()+2)));
   EXPECT(assert_equal((Matrix)(Matrix(1, 1) << 2.0).finished(), jf.getA(jf.begin()+3)));
   EXPECT(assert_equal((Vector)(Vector(1) << -5.0).finished(), jf.getb()));
+
+  // Test all functions/types for backwards compatibility
+  static_assert(std::is_same<TestFactor4::X1, double>::value,
+                "X1 type incorrect");
+  static_assert(std::is_same<TestFactor4::X2, double>::value,
+                "X2 type incorrect");
+  static_assert(std::is_same<TestFactor4::X3, double>::value,
+                "X3 type incorrect");
+  static_assert(std::is_same<TestFactor4::X4, double>::value,
+                "X4 type incorrect");
+  EXPECT(assert_equal(tf.key1(), X(1)));
+  EXPECT(assert_equal(tf.key2(), X(2)));
+  EXPECT(assert_equal(tf.key3(), X(3)));
+  EXPECT(assert_equal(tf.key4(), X(4)));
+  std::vector<Matrix> H = {Matrix(), Matrix(), Matrix(), Matrix()};
+  EXPECT(assert_equal(Vector1(10.0), tf.unwhitenedError(tv, H)));
 }
 
 /* ************************************************************************* */
 class TestFactor5 : public NoiseModelFactor5<double, double, double, double, double> {
 public:
+  static constexpr auto X_ = symbol_shorthand::X;  // collision with X<1>
   typedef NoiseModelFactor5<double, double, double, double, double> Base;
-  TestFactor5() : Base(noiseModel::Diagonal::Sigmas((Vector(1) << 2.0).finished()), X(1), X(2), X(3), X(4), X(5)) {}
+  TestFactor5() : Base(noiseModel::Diagonal::Sigmas((Vector(1) << 2.0).finished()), X_(1), X_(2), X_(3), X_(4), X_(5)) {}
 
   Vector
     evaluateError(const X1& x1, const X2& x2, const X3& x3, const X4& x4, const X5& x5,
@@ -429,8 +497,9 @@ TEST(NonlinearFactor, NoiseModelFactor5) {
 /* ************************************************************************* */
 class TestFactor6 : public NoiseModelFactor6<double, double, double, double, double, double> {
 public:
+  static constexpr auto X_ = symbol_shorthand::X;  // collision with X<1>
   typedef NoiseModelFactor6<double, double, double, double, double, double> Base;
-  TestFactor6() : Base(noiseModel::Diagonal::Sigmas((Vector(1) << 2.0).finished()), X(1), X(2), X(3), X(4), X(5), X(6)) {}
+  TestFactor6() : Base(noiseModel::Diagonal::Sigmas((Vector(1) << 2.0).finished()), X_(1), X_(2), X_(3), X_(4), X_(5), X_(6)) {}
 
   Vector
     evaluateError(const X1& x1, const X2& x2, const X3& x3, const X4& x4, const X5& x5, const X6& x6,
@@ -480,6 +549,76 @@ TEST(NonlinearFactor, NoiseModelFactor6) {
   EXPECT(assert_equal((Matrix)(Matrix(1, 1) << 3.0).finished(), jf.getA(jf.begin()+5)));
   EXPECT(assert_equal((Vector)(Vector(1) << -10.5).finished(), jf.getb()));
 
+}
+
+/* ************************************************************************* */
+class TestFactorN : public NoiseModelFactorN<double, double, double, double> {
+public:
+  static constexpr auto X_ = symbol_shorthand::X;  // collision with X<1>
+  typedef NoiseModelFactorN<double, double, double, double> Base;
+  TestFactorN() : Base(noiseModel::Diagonal::Sigmas((Vector(1) << 2.0).finished()), X_(1), X_(2), X_(3), X_(4)) {}
+
+  Vector
+    evaluateError(const double& x1, const double& x2, const double& x3, const double& x4,
+        boost::optional<Matrix&> H1 = boost::none,
+        boost::optional<Matrix&> H2 = boost::none,
+        boost::optional<Matrix&> H3 = boost::none,
+        boost::optional<Matrix&> H4 = boost::none) const override {
+    if (H1) *H1 = (Matrix(1, 1) << 1.0).finished();
+    if (H2) *H2 = (Matrix(1, 1) << 2.0).finished();
+    if (H3) *H3 = (Matrix(1, 1) << 3.0).finished();
+    if (H4) *H4 = (Matrix(1, 1) << 4.0).finished();
+    return (Vector(1) << x1 + x2 + x3 + x4).finished();
+  }
+};
+
+/* ************************************ */
+TEST(NonlinearFactor, NoiseModelFactorN) {
+  TestFactorN tf;
+  Values tv;
+  tv.insert(X(1), double((1.0)));
+  tv.insert(X(2), double((2.0)));
+  tv.insert(X(3), double((3.0)));
+  tv.insert(X(4), double((4.0)));
+  EXPECT(assert_equal((Vector(1) << 10.0).finished(), tf.unwhitenedError(tv)));
+  DOUBLES_EQUAL(25.0/2.0, tf.error(tv), 1e-9);
+  JacobianFactor jf(*boost::dynamic_pointer_cast<JacobianFactor>(tf.linearize(tv)));
+  LONGS_EQUAL((long)X(1), (long)jf.keys()[0]);
+  LONGS_EQUAL((long)X(2), (long)jf.keys()[1]);
+  LONGS_EQUAL((long)X(3), (long)jf.keys()[2]);
+  LONGS_EQUAL((long)X(4), (long)jf.keys()[3]);
+  EXPECT(assert_equal((Matrix)(Matrix(1, 1) << 0.5).finished(), jf.getA(jf.begin())));
+  EXPECT(assert_equal((Matrix)(Matrix(1, 1) << 1.0).finished(), jf.getA(jf.begin()+1)));
+  EXPECT(assert_equal((Matrix)(Matrix(1, 1) << 1.5).finished(), jf.getA(jf.begin()+2)));
+  EXPECT(assert_equal((Matrix)(Matrix(1, 1) << 2.0).finished(), jf.getA(jf.begin()+3)));
+  EXPECT(assert_equal((Vector)(Vector(1) << -5.0).finished(), jf.getb()));
+
+  // Test all evaluateError argument overloads to ensure backward compatibility
+  Matrix H1_expected, H2_expected, H3_expected, H4_expected;
+  Vector e_expected = tf.evaluateError(9, 8, 7, 6, H1_expected, H2_expected,
+                                       H3_expected, H4_expected);
+
+  std::unique_ptr<NoiseModelFactorN<double, double, double, double>> base_ptr(
+      new TestFactorN(tf));
+  Matrix H1, H2, H3, H4;
+  EXPECT(assert_equal(e_expected, base_ptr->evaluateError(9, 8, 7, 6)));
+  EXPECT(assert_equal(e_expected, base_ptr->evaluateError(9, 8, 7, 6, H1)));
+  EXPECT(assert_equal(H1_expected, H1));
+  EXPECT(assert_equal(e_expected,  //
+                      base_ptr->evaluateError(9, 8, 7, 6, H1, H2)));
+  EXPECT(assert_equal(H1_expected, H1));
+  EXPECT(assert_equal(H2_expected, H2));
+  EXPECT(assert_equal(e_expected,
+                      base_ptr->evaluateError(9, 8, 7, 6, H1, H2, H3)));
+  EXPECT(assert_equal(H1_expected, H1));
+  EXPECT(assert_equal(H2_expected, H2));
+  EXPECT(assert_equal(H3_expected, H3));
+  EXPECT(assert_equal(e_expected,
+                      base_ptr->evaluateError(9, 8, 7, 6, H1, H2, H3, H4)));
+  EXPECT(assert_equal(H1_expected, H1));
+  EXPECT(assert_equal(H2_expected, H2));
+  EXPECT(assert_equal(H3_expected, H3));
+  EXPECT(assert_equal(H4_expected, H4));
 }
 
 /* ************************************************************************* */
