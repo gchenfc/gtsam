@@ -1,6 +1,13 @@
 name: Windows CI
 
-on: [pull_request]
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'     
+        required: false
+        default: false
 
 jobs:
   build:
@@ -109,6 +116,12 @@ jobs:
           cmake --build build -j 4 --config ${{ matrix.build_type }} --target gtsam_unstable
           cmake --build build -j 4 --config ${{ matrix.build_type }} --target wrap
 
+      - name: Setup tmate debug session
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+
+      - name: Test
+        run: |
           # Run GTSAM tests
           cmake --build build -j 4 --config ${{ matrix.build_type }} --target check.base
           cmake --build build -j 4 --config ${{ matrix.build_type }} --target check.basis
@@ -125,4 +138,3 @@ jobs:
 
           # Run GTSAM_UNSTABLE tests
           #cmake --build build -j 4 --config ${{ matrix.build_type }} --target check.base_unstable
-          
