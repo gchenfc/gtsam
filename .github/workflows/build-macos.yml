@@ -49,3 +49,6 @@ jobs:
           fi
       - name: Build and Test
         run: bash .github/scripts/unix.sh -t
+
+      - name: Setup tmate debug session
+        uses: mxschmitt/action-tmate@v3
