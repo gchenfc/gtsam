@@ -117,7 +117,7 @@ TEST (Serialization, TemplatedValues) {
  *  (2) serialized string depends on boost version
  */
 TEST(Serialization, NoiseModelFactor1_backwards_compatibility) {
-  std::cout << "checkpoint: __FILE__, __LINE__" << std::endl;
+  std::cout << "checkpoint: " __FILE__ ", " << __LINE__ << std::endl;
   PriorFactor<Pose3> factor(
       12345, Pose3(Rot3::RzRyRx(Vector3(1., 2., 3.)), Point3(4., 5., 6.)),
       noiseModel::Unit::Create(6));
@@ -125,10 +125,10 @@ TEST(Serialization, NoiseModelFactor1_backwards_compatibility) {
   std::cout << "Serialized: \n"
             << serializeToString(factor) << "\nend serialization" << std::endl;
 
-  std::cout << "checkpoint: __FILE__, __LINE__" << std::endl;
+  std::cout << "checkpoint: " __FILE__ ", " << __LINE__ << std::endl;
 
   // String
-  std::cout << "checkpoint: __FILE__, __LINE__" << std::endl;
+  std::cout << "checkpoint: " __FILE__ ", " << __LINE__ << std::endl;
   std::string serialized_str =
       "22 serialization::archive 15 1 0\n"
       "0 0 0 0 0 0 0 1 0 12345 0 1 6 21 gtsam_noiseModel_Unit 1 0\n"
@@ -155,6 +155,15 @@ TEST(Serialization, NoiseModelFactor1_backwards_compatibility) {
     EXPECT(assert_equal(factor, factor_deserialized_str_2));
     std::cout << "roundtrip end" << std::endl;
   // }
+
+
+  std::cout << "-----------------" << std::endl;
+  std::cout << serializeToXMLString(factor, "factor") << std::endl;
+  std::cout << "-----------------" << std::endl;
+
+  std::cout << "-----------------" << std::endl;
+  std::cout << serializeToString(factor) << std::endl;
+  std::cout << "-----------------" << std::endl;
 
   PriorFactor<Pose3> factor_deserialized_str = PriorFactor<Pose3>();
   std::cout << "checkpoint: " << __FILE__ << ", " << __LINE__ << std::endl;
