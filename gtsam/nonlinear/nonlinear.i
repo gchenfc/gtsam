@@ -544,12 +544,34 @@ virtual class DoglegParams : gtsam::NonlinearOptimizerParams {
 };
 
 #include <gtsam/nonlinear/GncParams.h>
+enum GncLossType {
+  GM /*Geman McClure*/,
+  TLS /*Truncated least squares*/
+};
+
 template<PARAMS>
 virtual class GncParams {
   GncParams(const PARAMS& baseOptimizerParams);
   GncParams();
+  BaseOptimizerParameters baseOptimizerParams;
+  GncLossType lossType;
+  size_t maxIterations;
+  double muStep;
+  double relativeCostTol;
+  double weightsTol;
+  Verbosity verbosity;
+  gtsam::KeyVector knownInliers;
+  gtsam::KeyVector knownOutliers;
+
+  void setLossType(const GncLossType type);
+  void setMaxIterations(const size_t maxIter);
+  void setMuStep(const double step);
+  void setRelativeCostTol(double value);
+  void setWeightsTol(double value);
   void setVerbosityGNC(const This::Verbosity value);
-  void print(const string& str) const;
+  void setKnownInliers(const gtsam::KeyVector& knownIn);
+  void setKnownOutliers(const gtsam::KeyVector& knownOut);
+  void print(const string& str = "GncParams: ") const;
   
   enum Verbosity {
     SILENT,
@@ -597,6 +619,11 @@ virtual class GncOptimizer {
   GncOptimizer(const gtsam::NonlinearFactorGraph& graph,
                const gtsam::Values& initialValues,
                const PARAMS& params);
+  void setInlierCostThresholds(const double inth);
+  const Vector& getInlierCostThresholds();
+  void setInlierCostThresholdsAtProbability(const double alpha);
+  void setWeights(const Vector w);
+  const Vector& getWeights();
   gtsam::Values optimize();
 };
 
