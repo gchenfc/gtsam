@@ -136,4 +136,4 @@ jobs:
 
       - name: Setup tmate debug session
         uses: mxschmitt/action-tmate@v3
-        if: ${{ (success() || failure()) && github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+        if: ${{ failure() && github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
