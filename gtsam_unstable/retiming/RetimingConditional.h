@@ -25,12 +25,10 @@ class GTSAM_EXPORT RetimingConditional
 
   // Constructors
   using RetimingFactor::RetimingFactor;
-  // RetimingConditional(const RetimingFactor& factor, size_t nrFrontals = 0)
-  //     : RetimingFactor(factor), Conditional(nrFrontals) {}
 
   static shared_ptr Equality(const KeyVector& keys, const Linear& equality) {
-    return std::make_shared<RetimingConditional>(keys, RetimingObjectives{},
-                                                 Linears{equality}, Linears{});
+    return std::make_shared<RetimingConditional>(
+        keys, RetimingObjectives{}, equality, Linears(0, keys.size() + 1));
   }
 
   // Implementation from Conditional

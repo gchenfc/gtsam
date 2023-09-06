@@ -28,6 +28,13 @@
 using namespace std;
 using namespace gtsam;
 
+Matrix LinConstr(std::initializer_list<double> a, double b) {
+  Vector ret(a.size() + 1);
+  std::copy(a.begin(), a.end(), ret.begin());
+  ret(a.size()) = b;
+  return ret.transpose();
+}
+
 /* ************************************************************************* */
 TEST(eliminate, eliminate_linear_equality) {
   // GTSAM_EXPORT std::pair<std::shared_ptr<RetimingConditional>,
@@ -41,9 +48,8 @@ TEST(eliminate, eliminate_linear_equality) {
   // 5x + 6y     <= 0.3
   RetimingFactorGraph factors;
   factors.push_back(
-      RetimingFactor::Equality({x, y, z}, {.A = {1, 2, 3}, .b = 0.2}));
-  factors.push_back(
-      RetimingFactor::Inequality({x, y}, {.A = {5, 6}, .b = 0.3}));
+      RetimingFactor::Equality({x, y, z}, LinConstr({1, 2, 3}, 0.2)));
+  factors.push_back(RetimingFactor::Inequality({x, y}, LinConstr({5, 6}, 0.3)));
 
   auto [actual_cond, actual_joint] = EliminateRetiming(factors, {x});
   // Expect:
@@ -54,7 +60,7 @@ TEST(eliminate, eliminate_linear_equality) {
 
   auto expected_cond = factors.at(0);
   auto expected_joint =
-      RetimingFactor::Inequality({y, z}, {.A = {-4, -15}, .b = -0.7});
+      RetimingFactor::Inequality({y, z}, LinConstr({-4, -15}, -0.7));
 
   CHECK(actual_cond);
   CHECK(actual_joint);

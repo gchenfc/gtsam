@@ -2,6 +2,7 @@
 
 #include <gtsam/inference/Ordering.h>
 #include "RetimingConditional.h"
+#include "RetimingFactorGraph.h"
 
 namespace gtsam {
 
@@ -12,26 +13,37 @@ EliminateRetiming(const RetimingFactorGraph& factors, const Ordering& keys) {
   }
   const auto& key = keys.at(0);
 
-  // Collect all the objectives/constraints into a single factor
-  RetimingFactor factor(factors);
-
-  // Find where the key is in the new combined factor
-  const auto& keyIt = factor.find(key);
-  if (keyIt == factor.end()) {
-    throw std::runtime_error("Key not found in factor");
+  // Create an ordering with the key at the front.  We could use the functions
+  // in Ordering.h but that's overkill since we only care about the first key
+  KeyVector ordering = factors.keyVector();
+  {  // Swap the key to the front
+    const auto& keyIt = std::find(ordering.begin(), ordering.end(), key);
+    if (keyIt == ordering.end()) {
+      throw std::runtime_error("Key not found in ordering");
+    }
+    auto keyIndex = std::distance(ordering.begin(), keyIt);
+    ordering.at(keyIndex) = ordering.at(0);
+    ordering.at(0) = key;
   }
-  auto keyIndex = std::distance(std::as_const(factor).begin(), keyIt);
+  constexpr int col_index = 0;
 
-  // First search through all the equalities
+  // Collect all the objectives/constraints into a single factor
+  RetimingFactor factor(factors, ordering);
+
+  // First check if there are any equalities that can be used for elimination
   const auto& equalities = factor.equalities();
-  auto it = equalities.begin();
-  for (; it != equalities.end(); ++it) {
-    if (it->A.at(keyIndex) != 0) {
-      RetimingFactor::Linear cond = *it;  // Make a copy
-      factor.equalities().erase(it);
-      return {
-          /*Conditional*/ RetimingConditional::Equality(factor.keys(), cond),
-          /*   Joint   */ factor.substitute(keyIndex, cond)};
+  if (equalities.leftCols<1>().any()) {
+    // Gauss-Jordan elimination on the first column
+    for (int r = 0; r < equalities.rows(); ++r) {
+      if (equalities(r, col_index) != 0) {
+        const LinearConstraint::Linear equality =
+            equalities.row(r) / equalities(r, col_index);
+        // Remove equality from factor, since it's now redundant
+        factor.equalities() = LinearConstraint::dropRow(equalities, r);
+        return {/*Conditional*/ RetimingConditional::Equality(factor.keys(),
+                                                              equality),
+                /*   Joint   */ factor.substitute(col_index, equality)};
+      }
     }
   }
 

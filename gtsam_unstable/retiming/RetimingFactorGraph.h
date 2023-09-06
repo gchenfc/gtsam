@@ -76,9 +76,9 @@ class GTSAM_EXPORT RetimingFactorGraph
   /// @}
 
   // Accumulate all the objectives/constraints
-  RetimingObjectives objectives() const;
-  RetimingFactor::Linears equalities() const;
-  RetimingFactor::Linears inequalities() const;
+  RetimingObjectives objectives(const KeyVector& ordering) const;
+  RetimingFactor::Linears equalities(const KeyVector& ordering) const;
+  RetimingFactor::Linears inequalities(const KeyVector& ordering) const;
 };
 
 }  // namespace gtsam

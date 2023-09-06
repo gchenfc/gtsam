@@ -8,6 +8,7 @@
  */
 #pragma once
 
+#include <gtsam/base/Matrix.h>
 #include <gtsam/base/Testable.h>
 #include <gtsam/base/VectorSpace.h>  // traits for double
 #include <gtsam/inference/Factor.h>
@@ -23,8 +24,8 @@ class GTSAM_EXPORT RetimingFactor : public Factor {
  public:
   using shared_ptr = std::shared_ptr<RetimingFactor>;
   using This = RetimingFactor;
-  using Linear = retiming::Linear;
-  using Linears = std::vector<Linear>;
+  using Linear = LinearConstraint::Linear;
+  using Linears = LinearConstraint::Linears;
 
   // Constructors
   RetimingFactor(const KeyVector& keys, const RetimingObjectives& objectives,
@@ -35,21 +36,23 @@ class GTSAM_EXPORT RetimingFactor : public Factor {
         inequalities_(inequality) {}
 
   RetimingFactor(const RetimingFactorGraph& factors);
+  RetimingFactor(const RetimingFactorGraph& factors, const KeyVector& ordering);
 
   // Static convenience constructors
   static shared_ptr Objective(const KeyVector& keys,
                               const RetimingObjective& objective) {
     return std::make_shared<RetimingFactor>(keys, RetimingObjectives{objective},
-                                            Linears{}, Linears{});
+                                            Linears(0, keys.size() + 1),
+                                            Linears(0, keys.size() + 1));
   }
   static shared_ptr Equality(const KeyVector& keys, const Linear& equality) {
-    return std::make_shared<RetimingFactor>(keys, RetimingObjectives{},
-                                            Linears{equality}, Linears{});
+    return std::make_shared<RetimingFactor>(
+        keys, RetimingObjectives{}, equality, Linears(0, keys.size() + 1));
   }
   static shared_ptr Inequality(const KeyVector& keys,
                                const Linear& inequality) {
-    return std::make_shared<RetimingFactor>(keys, RetimingObjectives{},
-                                            Linears{}, Linears{inequality});
+    return std::make_shared<RetimingFactor>(
+        keys, RetimingObjectives{}, Linears(0, keys.size() + 1), inequality);
   }
 
   /// Substitute a variable with a linear equality constraint by performing
@@ -69,10 +72,16 @@ class GTSAM_EXPORT RetimingFactor : public Factor {
   void print(
       const std::string& s = "Retiming Factor",
       const KeyFormatter& formatter = DefaultKeyFormatter) const override {
-    std::cout << s << "\n";
-    for (auto o : objectives_) traits<RetimingObjective>::Print(o, "\tCost:");
-    for (auto e : equalities_) e.print("\tEquality Constraint:");
-    for (auto e : inequalities_) e.print("\tInequality Constraint:");
+    this->Factor::print(s, formatter);
+    for (auto o : objectives_) {
+      traits<RetimingObjective>::Print(o, "\tCost:");
+    }
+    for (auto e : equalities_.rowwise()) {
+      LinearConstraint::print(e, "\tEquality Constraint:");
+    }
+    for (auto e : inequalities_.rowwise()) {
+      LinearConstraint::print(e, "\tInequality Constraint:");
+    }
   }
   bool equals(const This& other, double tol = 1e-9) const {
     return traits<RetimingObjectives>::Equals(objectives_, other.objectives_,

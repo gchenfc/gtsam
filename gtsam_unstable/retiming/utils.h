@@ -22,7 +22,7 @@ template <typename T>
 struct traits<std::vector<T>> {
   static void Print(const std::vector<T>& v, const std::string& str = "") {
     std::cout << str << " {";
-    for (const T& e : v) traits<T>::Print(v, ",");
+    for (const T& e : v) traits<T>::Print(e, ",");
     std::cout << "}" << std::endl;
   }
   static bool Equals(const std::vector<T>& m1, const std::vector<T>& m2,
@@ -50,16 +50,21 @@ std::vector<T> rekey(const std::vector<T>& src, const KeyVector& src_keys,
   return result;
 }
 
-namespace retiming {
-/// Linear (In)Equality Constraint (Ax = b) or (Ax <= b)
-struct Linear {
-  std::vector<double> A;
-  double b;
+/// Static Functions for Linear (In)Equality Constraints (Ax = b) or (Ax <= b)
+struct LinearConstraint {
+  using Linear = Eigen::Matrix<double, 1, Eigen::Dynamic>;
+  using Linears = Matrix;
 
-  /// Rekey the linear constraint by shifting the coefficients to new positions
-  Linear rekey(const KeyVector& dest_keys, const KeyVector& src_keys) const {
-    Linear result;
-    result.A.resize(dest_keys.size(), 0.0);
+  /// Extract A, b from augmented matrix
+  static Matrix getA(Matrix& src) { return src.leftCols(src.cols() - 1); }
+  static Vector getb(Matrix& src) { return src.rightCols<1>(); }
+
+  /// Rekey the linear constraint by transposing the columns
+  static Matrix rekey(const Matrix& src, const KeyVector& src_keys,
+                      const KeyVector& dest_keys) {
+    Matrix result(src.rows(), dest_keys.size() + 1);
+    result.setZero();
+
     // Use a linear search because keys should only be 2-3 elements long so
     // unordered_map probably slower
     for (int i = 0; i < src_keys.size(); ++i) {
@@ -68,32 +73,48 @@ struct Linear {
           std::find(dest_keys.begin(), dest_keys.end(), src_key);
       if (dest_it != dest_keys.end()) {
         const auto& dest_loc = std::distance(dest_keys.begin(), dest_it);
-        result.A.at(dest_loc) = A.at(i);
+        result.col(dest_loc) = src.col(i);
       }
     }
-    result.b = b;
+    result.rightCols<1>() = src.rightCols<1>();
     return result;
   }
 
-  // Testable
-  void print(const std::string& s = "Linear",
-             const KeyFormatter& formatter = DefaultKeyFormatter) const {
-    std::cout << s << " ";
-    for (int i = 0; i < A.size(); ++i) {
-      std::cout << A.at(i) << ".x" << i;
-      if (i < A.size() - 1) std::cout << " + ";
+  /// Gauss-Jordan Elimination of one column.  Returns a matrix (r)x(c-1)
+  static Matrix eliminate(const Matrix& src, const Linear& row, const int col) {
+    Matrix result(src.rows(), src.cols() - 1);
+    // Set left-half
+    if (col > 0) {
+      result.leftCols(col - 1) =
+          src.leftCols(col - 1) - src.col(col) / row(col) * row.head(col - 1);
     }
-    std::cout << " = " << b << std::endl;
+    // Set right-half
+    if (col < src.cols() - 1) {
+      result.rightCols(src.cols() - col - 1) =
+          src.rightCols(src.cols() - col - 1) -
+          src.col(col) / row(col) * row.tail(src.cols() - col - 1);
+    }
+    return result;
   }
-  bool equals(const Linear& other, double tol = 1e-9) const {
-    return traits<double>::Equals(b, other.b, tol) &&
-           traits<std::vector<double>>::Equals(A, other.A, tol);
+
+  /// Erase one row of a matrix
+  static Matrix dropRow(const Matrix& src, const int row) {
+    Matrix result(src.rows() - 1, src.cols());
+    result.topRows(row) = src.topRows(row);
+    result.bottomRows(src.rows() - row - 1) =
+        src.bottomRows(src.rows() - row - 1);
+    return result;
+  }
+
+  // Print a single row (one linear constraint)
+  static void print(const Vector& row, const std::string& s = "") {
+    std::cout << s << " ";
+    for (int i = 0; i < row.size() - 1; ++i) {
+      std::cout << row(i) << ".x" << i;
+      if (i < row.size() - 1) std::cout << " + ";
+    }
+    std::cout << " = " << row.tail(1) << std::endl;
   }
 };
-
-}  // namespace retiming
-
-template <>
-struct traits<retiming::Linear> : public Testable<retiming::Linear> {};
 
 }  // namespace gtsam
