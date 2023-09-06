@@ -76,31 +76,21 @@ TEST(eliminate, eliminate_linear_equality_long) {
     factors.push_back(
         RetimingFactor::Equality({X(i), X(i + 1)}, LinConstr({1.03, -1}, 0.0)));
   }
-  for (int i = 0; i <= 100; ++i) {
-    factors.push_back(
-        RetimingFactor::Inequality({X(i)}, LinConstr({1}, 100.0)));
-  }
-  traits<KeyVector>::Print(factors.keyVector(), "Keys");
+  factors.push_back(RetimingFactor::Equality({X(0)}, LinConstr({1}, 1.0)));
+
   auto sol = factors.eliminateSequential();
-  std::cout << sol << std::endl;
-  sol->print("Solution!");
-  std::cout << sol->at(100) << std::endl;
+  CHECK(sol);
+  auto actual_x100 = sol->at(100);
+  CHECK(actual_x100);
 
-  // auto [actual_cond, actual_joint] = EliminateRetiming(factors, {x});
-  // // Expect:
-  // // conditional: x = 0.2 - 2y - 3z, but actually this is just represented by
-  // // the same equality because it's trivial to solve
-  // // joint: (1 - 10y - 15z) + 6y <= 0.3
-  // //                   -4y - 15z <= -0.7
+  // sol->print("Solution!");
+  // actual_x100->print("Final Conditional:");
 
-  // auto expected_cond = factors.at(0);
-  // auto expected_joint =
-  //     RetimingFactor::Inequality({y, z}, LinConstr({-4, -15}, -0.7));
+  auto expected_x100 =
+      RetimingConditional::Equality({X(100)}, LinConstr({1}, 19.2186319809));
 
-  // CHECK(actual_cond);
-  // CHECK(actual_joint);
-  // EXPECT(expected_cond->equals(*actual_cond, 1e-9));
-  // EXPECT(expected_joint->equals(*actual_joint, 1e-9));
+  EXPECT_LONGS_EQUAL(101, sol->size());
+  EXPECT(expected_x100->equals(*sol->at(100), 1e-9));
 }
 
 /* ************************************************************************* */

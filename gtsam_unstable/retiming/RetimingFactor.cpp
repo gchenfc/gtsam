@@ -64,8 +64,20 @@ void RetimingFactor::removeRedundantInequalitiesInplace(Matrix& inequalities) {
       }
     }
     if (lower_bound > upper_bound) throw std::runtime_error("Infeasible");
-    inequalities =
-        (Matrix(2, 2) << 1, upper_bound, -1, -lower_bound).finished();
+
+    bool has_lower = (lower_bound != std::numeric_limits<double>::lowest()),
+         has_upper = (upper_bound != std::numeric_limits<double>::max());
+    if (has_lower && has_upper) {
+      inequalities =
+          (Matrix(2, 2) << 1, upper_bound, -1, -lower_bound).finished();
+    } else if (!has_lower && has_upper) {
+      inequalities = (Matrix(1, 2) << 1, upper_bound).finished();
+    } else if (has_lower && !has_upper) {
+      inequalities = (Matrix(1, 2) << -1, -lower_bound).finished();
+    } else {
+      inequalities = Matrix(0, 2);
+    }
+
   } else {
     // This might grow exponentially so let's just ignore it
   }
