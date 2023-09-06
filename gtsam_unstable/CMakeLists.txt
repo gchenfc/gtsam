@@ -9,6 +9,7 @@ set (gtsam_unstable_subdirs
     discrete
     dynamics
     nonlinear
+    retiming
     slam
 )
 
@@ -74,6 +75,7 @@ set(gtsam_unstable_srcs
     ${discrete_srcs}
     ${dynamics_srcs}
     ${nonlinear_srcs}
+    ${retiming_srcs}
     ${slam_srcs}
 )
 
