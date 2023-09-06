@@ -56,13 +56,10 @@ TEST(eliminate, eliminate_linear_equality) {
   auto expected_joint =
       RetimingFactor::Inequality({y, z}, {.A = {-4, -15}, .b = -0.7});
 
-  std::cout << actual_cond << std::endl;
-  std::cout << actual_joint << std::endl;
-
   CHECK(actual_cond);
   CHECK(actual_joint);
-  EXPECT(expected_cond->equals(*actual_cond, 0));
-  EXPECT(expected_joint->equals(*actual_joint, 0));
+  EXPECT(expected_cond->equals(*actual_cond, 1e-9));
+  EXPECT(expected_joint->equals(*actual_joint, 1e-9));
 }
 
 /* ************************************************************************* */

@@ -52,10 +52,18 @@ class GTSAM_EXPORT RetimingFactor : public Factor {
                                             Linears{}, Linears{inequality});
   }
 
+  /// Substitute a variable with a linear equality constraint by performing
+  /// Gaussian elimination on that column
+  shared_ptr substitute(const size_t& column, const Linear& equality) const;
+
   // Getters
   const RetimingObjectives& objectives() const { return objectives_; }
   const Linears& equalities() const { return equalities_; }
   const Linears& inequalities() const { return inequalities_; }
+
+  RetimingObjectives& objectives() { return objectives_; }
+  Linears& equalities() { return equalities_; }
+  Linears& inequalities() { return inequalities_; }
 
   // Testable
   void print(

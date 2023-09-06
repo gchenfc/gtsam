@@ -23,6 +23,38 @@ class GTSAM_EXPORT RetimingConditional
   using shared_ptr = std::shared_ptr<RetimingConditional>;
   using This = RetimingConditional;
 
+  // Constructors
+  using RetimingFactor::RetimingFactor;
+  // RetimingConditional(const RetimingFactor& factor, size_t nrFrontals = 0)
+  //     : RetimingFactor(factor), Conditional(nrFrontals) {}
+
+  static shared_ptr Equality(const KeyVector& keys, const Linear& equality) {
+    return std::make_shared<RetimingConditional>(keys, RetimingObjectives{},
+                                                 Linears{equality}, Linears{});
+  }
+
+  // Implementation from Conditional
+
+  /**
+   * All conditional types need to implement a `logProbability` function, for
+   * which exp(logProbability(x)) = evaluate(x).
+   */
+  double logProbability(const HybridValues& c) const override { return 0.0; };
+
+  /**
+   * All conditional types need to implement an `evaluate` function, that yields
+   * a true probability. The default implementation just exponentiates
+   * logProbability.
+   */
+  double evaluate(const HybridValues& c) const override { return 0.0; };
+
+  /**
+   * All conditional types need to implement a log normalization constant to
+   * make it such that error>=0.
+   */
+  double logNormalizationConstant() const override { return 0.0; };
+
+  // TODO!!!
   ScalarValues solve(const ScalarValues& parents) { return {{0, 0.0}}; }
 
   // Testable
