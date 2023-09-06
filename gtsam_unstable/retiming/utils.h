@@ -107,13 +107,14 @@ struct LinearConstraint {
   }
 
   // Print a single row (one linear constraint)
-  static void print(const Vector& row, const std::string& s = "") {
+  static void print(const Vector& row, const std::string& s = "",
+                    const std::string& equalityString = "=") {
     std::cout << s << " ";
     for (int i = 0; i < row.size() - 1; ++i) {
       std::cout << row(i) << ".x" << i;
-      if (i < row.size() - 1) std::cout << " + ";
+      if (i < row.size() - 2) std::cout << " + ";
     }
-    std::cout << " = " << row.tail(1) << std::endl;
+    std::cout << " " << equalityString << " " << row.tail(1) << std::endl;
   }
 };
 

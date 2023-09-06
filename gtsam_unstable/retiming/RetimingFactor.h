@@ -29,35 +29,55 @@ class GTSAM_EXPORT RetimingFactor : public Factor {
 
   // Constructors
   RetimingFactor(const KeyVector& keys, const RetimingObjectives& objectives,
-                 const Linears& equality, const Linears& inequality)
+                 const Linears& equality, const Linears& inequality,
+                 bool removeRedundantConstraints = true,
+                 bool checkForInfeasibility = true)
       : Factor(keys),
         objectives_(objectives),
         equalities_(equality),
-        inequalities_(inequality) {}
+        inequalities_(inequality) {
+    if (removeRedundantConstraints) {
+      removeRedundantEqualitiesInplace(equalities_, checkForInfeasibility);
+      removeRedundantInequalitiesInplace(inequalities_);
+    }
+  }
 
-  RetimingFactor(const RetimingFactorGraph& factors);
-  RetimingFactor(const RetimingFactorGraph& factors, const KeyVector& ordering);
+  RetimingFactor(const RetimingFactorGraph& factors,
+                 bool removeRedundantConstraints = true,
+                 bool checkForInfeasibility = true);
+  RetimingFactor(const RetimingFactorGraph& factors, const KeyVector& ordering,
+                 bool removeRedundantConstraints = true,
+                 bool checkForInfeasibility = true);
 
   // Static convenience constructors
   static shared_ptr Objective(const KeyVector& keys,
                               const RetimingObjective& objective) {
     return std::make_shared<RetimingFactor>(keys, RetimingObjectives{objective},
                                             Linears(0, keys.size() + 1),
-                                            Linears(0, keys.size() + 1));
+                                            Linears(0, keys.size() + 1), false);
   }
   static shared_ptr Equality(const KeyVector& keys, const Linear& equality) {
-    return std::make_shared<RetimingFactor>(
-        keys, RetimingObjectives{}, equality, Linears(0, keys.size() + 1));
+    return std::make_shared<RetimingFactor>(keys, RetimingObjectives{},
+                                            equality,
+                                            Linears(0, keys.size() + 1), false);
   }
   static shared_ptr Inequality(const KeyVector& keys,
                                const Linear& inequality) {
-    return std::make_shared<RetimingFactor>(
-        keys, RetimingObjectives{}, Linears(0, keys.size() + 1), inequality);
+    return std::make_shared<RetimingFactor>(keys, RetimingObjectives{},
+                                            Linears(0, keys.size() + 1),
+                                            inequality, false);
   }
 
   /// Substitute a variable with a linear equality constraint by performing
   /// Gaussian elimination on that column
   shared_ptr substitute(const size_t& column, const Linear& equality) const;
+
+  /// Remove redundant equality constraints using QR
+  static void removeRedundantEqualitiesInplace(
+      Matrix& equalities, bool checkForInfeasibility = true);
+
+  /// Remove redundant inequality constraints if only 1 variable is involved
+  static void removeRedundantInequalitiesInplace(Matrix& inequalities);
 
   // Getters
   const RetimingObjectives& objectives() const { return objectives_; }
@@ -80,7 +100,7 @@ class GTSAM_EXPORT RetimingFactor : public Factor {
       LinearConstraint::print(e, "\tEquality Constraint:");
     }
     for (auto e : inequalities_.rowwise()) {
-      LinearConstraint::print(e, "\tInequality Constraint:");
+      LinearConstraint::print(e, "\tInequality Constraint:", "<=");
     }
   }
   bool equals(const This& other, double tol = 1e-9) const {

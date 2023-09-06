@@ -77,13 +77,14 @@ TEST(RetimingFactor, ConstructFromGraph) {
                      Stack({
                          LinConstr({2.1, 2.2}, 2.3),
                          LinConstr({2.4, 2.5}, 2.6),
-                     })));
+                     }),
+                     false));
   factors.push_back(RetimingFactor::Equality({z}, LinConstr({5}, 0.1)));
   factors.push_back(RetimingFactor::Inequality({y}, LinConstr({6}, 0.3)));
   factors.push_back(
       RetimingFactor::Inequality({z, x}, LinConstr({2, 7}, -0.3)));
 
-  RetimingFactor actual(factors);
+  RetimingFactor actual(factors, false, false);
 
   RetimingFactor expected(
       {x, y, z},
@@ -101,7 +102,102 @@ TEST(RetimingFactor, ConstructFromGraph) {
           LinConstr({2.4, 0, 2.5}, 2.6),
           LinConstr({0, 6, 0}, 0.3),
           LinConstr({7, 0, 2}, -0.3),
-      }));
+      }),
+      false, false);
+
+  EXPECT(expected.equals(actual, 1e-9));
+}
+
+/* ************************************************************************* */
+/*      Suite of tests testing removal of redundant constraints              */
+/* ************************************************************************* */
+
+#define TEST_MATRIX_EQUALITY(func, input, expected, checkInfeasibility) \
+  {                                                                     \
+    Matrix actual = input;                                              \
+    func(actual, checkInfeasibility);                                   \
+    EXPECT(assert_equal(expected, actual, 1e-9));                       \
+  }
+
+#define TEST_MATRIX_INFEASIBILITY(func, input)               \
+  {                                                          \
+    Matrix actual = input;                                   \
+    CHECK_EXCEPTION(func(actual, true), std::runtime_error); \
+  }
+
+auto removeRedundantEqualitiesInplace =
+    RetimingFactor::removeRedundantEqualitiesInplace;
+
+TEST(RetimingFactor, RemoveEqualityRedundancies_Basic3x4Matrix) {
+  Matrix Ab(3, 4);
+  Ab << 1, 2, 3, 4,  //
+      0, 0, 0, 5,    //
+      0, 0, 0, 0;
+  Matrix Ab_expected = Ab;
+  TEST_MATRIX_EQUALITY(removeRedundantEqualitiesInplace, Ab, Ab_expected,
+                       false);
+  TEST_MATRIX_INFEASIBILITY(removeRedundantEqualitiesInplace, Ab);
+}
+
+TEST(RetimingFactor, RemoveEqualityRedundancies_Basic5x4Matrix) {
+  Matrix Ab(5, 4);
+  Ab << 1, 2, 3, 4,  //
+      0, 5, 6, 7,    //
+      0, 0, 1, 8,    //
+      0, 0, 0, 0,    //
+      0, 0, 0, 0;
+
+  Matrix Ab_expected(4, 4);
+  Ab_expected << Ab.topRows(4);
+
+  TEST_MATRIX_EQUALITY(removeRedundantEqualitiesInplace, Ab, Ab_expected, true);
+}
+
+TEST(RetimingFactor, RemoveEqualityRedundancies_InfeasibleMatrix) {
+  Matrix Ab(3, 4);
+  Ab << 1, 2, 3, 4,  //
+      0, 0, 0, 5,    //
+      0, 0, 0, 10;
+
+  TEST_MATRIX_INFEASIBILITY(removeRedundantEqualitiesInplace, Ab);
+}
+
+TEST(RetimingFactor, RemoveEqualityRedundancies_NoRedundantRows) {
+  Matrix Ab(3, 4);
+  Ab << 1, 2, 3, 4,  //
+      5, 6, 7, 8,    //
+      9, 10, 11, 12;
+
+  Matrix Ab_expected(3, 4);
+  Ab_expected << -10.3440804327886, -11.794185166357096, -13.244289899925591,
+      -14.694394633494087,                                      //
+      0, 0.94720444555663, 1.89440889111326, 2.84161333666989,  //
+      0, 0, 0, 0;
+
+  TEST_MATRIX_EQUALITY(removeRedundantEqualitiesInplace, Ab, Ab_expected, true);
+}
+
+TEST(RetimingFactor, RemoveRedundantConstraints) {
+  // First start with a relatively large one where we don't expect the
+  // inequalities to change at all
+  Matrix Ab(3, 4);
+  Ab << 1, 2, 3, 4,  //
+      5, 6, 7, 8,    //
+      9, 10, 11, 12;
+
+  Matrix Ab_expected(3, 4);
+  Ab_expected << -10.3440804327886, -11.794185166357096, -13.244289899925591,
+      -14.694394633494087,                                      //
+      0, 0.94720444555663, 1.89440889111326, 2.84161333666989,  //
+      0, 0, 0, 0;
+
+  Matrix Cd(1, 4);
+  Cd << 1, 2, 3, 4;
+
+  RetimingFactor actual({0, 1, 2, 3}, RetimingObjectives{}, Ab, Cd);
+
+  RetimingFactor expected({0, 1, 2, 3}, RetimingObjectives{}, Ab_expected, Cd,
+                          false, false);
 
   EXPECT(expected.equals(actual, 1e-9));
 }
