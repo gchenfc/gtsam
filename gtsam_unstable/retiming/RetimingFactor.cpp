@@ -86,4 +86,29 @@ RetimingFactor::shared_ptr RetimingFactor::substitute(
   return result;
 }
 
+/******************************************************************************/
+
+void RetimingFactor::print(const std::string& s,
+                           const KeyFormatter& formatter) const {
+  this->Factor::print(s, formatter);
+  for (auto o : objectives_) {
+    traits<RetimingObjective>::Print(o, "\tCost:");
+  }
+  for (auto e : equalities_.rowwise()) {
+    LinearConstraint::print(e, "\tEquality Constraint:", "=", keys_);
+  }
+  for (auto e : inequalities_.rowwise()) {
+    LinearConstraint::print(e, "\tInequality Constraint:", "<=", keys_);
+  }
+}
+
+/******************************************************************************/
+
+bool RetimingFactor::equals(const This& other, double tol) const {
+  return traits<RetimingObjectives>::Equals(objectives_, other.objectives_,
+                                            tol) &&
+         traits<Linears>::Equals(equalities_, other.equalities_, tol) &&
+         traits<Linears>::Equals(inequalities_, other.inequalities_, tol);
+}
+
 }  // namespace gtsam

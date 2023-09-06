@@ -108,10 +108,16 @@ struct LinearConstraint {
 
   // Print a single row (one linear constraint)
   static void print(const Vector& row, const std::string& s = "",
-                    const std::string& equalityString = "=") {
+                    const std::string& equalityString = "=",
+                    std::optional<KeyVector> keys = std::nullopt,
+                    const KeyFormatter& formatter = DefaultKeyFormatter) {
     std::cout << s << " ";
     for (int i = 0; i < row.size() - 1; ++i) {
-      std::cout << row(i) << ".x" << i;
+      if (keys) {
+        std::cout << row(i) << "*" << formatter(keys->at(i));
+      } else {
+        std::cout << row(i) << ".x" << i;
+      }
       if (i < row.size() - 2) std::cout << " + ";
     }
     std::cout << " " << equalityString << " " << row.tail(1) << std::endl;

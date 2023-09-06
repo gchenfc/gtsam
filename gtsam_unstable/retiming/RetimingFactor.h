@@ -91,24 +91,8 @@ class GTSAM_EXPORT RetimingFactor : public Factor {
   // Testable
   void print(
       const std::string& s = "Retiming Factor",
-      const KeyFormatter& formatter = DefaultKeyFormatter) const override {
-    this->Factor::print(s, formatter);
-    for (auto o : objectives_) {
-      traits<RetimingObjective>::Print(o, "\tCost:");
-    }
-    for (auto e : equalities_.rowwise()) {
-      LinearConstraint::print(e, "\tEquality Constraint:");
-    }
-    for (auto e : inequalities_.rowwise()) {
-      LinearConstraint::print(e, "\tInequality Constraint:", "<=");
-    }
-  }
-  bool equals(const This& other, double tol = 1e-9) const {
-    return traits<RetimingObjectives>::Equals(objectives_, other.objectives_,
-                                              tol) &&
-           traits<Linears>::Equals(equalities_, other.equalities_, tol) &&
-           traits<Linears>::Equals(inequalities_, other.inequalities_, tol);
-  }
+      const KeyFormatter& formatter = DefaultKeyFormatter) const override;
+  bool equals(const This& other, double tol = 1e-9) const;
 
  protected:
   // Member variables
