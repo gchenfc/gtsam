@@ -47,6 +47,8 @@ EliminateRetiming(const RetimingFactorGraph& factors, const Ordering& keys) {
     }
   }
 
+  // TODO(gerry): handle inequality and objective elimination
+
   return {nullptr, nullptr};
 }
 
