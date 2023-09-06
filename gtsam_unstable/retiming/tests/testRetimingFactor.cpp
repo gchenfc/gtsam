@@ -177,7 +177,7 @@ TEST(RetimingFactor, RemoveEqualityRedundancies_NoRedundantRows) {
   TEST_MATRIX_EQUALITY(removeRedundantEqualitiesInplace, Ab, Ab_expected, true);
 }
 
-TEST(RetimingFactor, RemoveRedundantConstraints) {
+TEST(RetimingFactor, RemoveRedundantConstraints1) {
   // First start with a relatively large one where we don't expect the
   // inequalities to change at all
   Matrix Ab(3, 4);
@@ -200,6 +200,49 @@ TEST(RetimingFactor, RemoveRedundantConstraints) {
                           false, false);
 
   EXPECT(expected.equals(actual, 1e-9));
+}
+
+TEST(RetimingFactor, RemoveRedundantConstraints2) {
+  // Next do a single-variable elimination where we expect the inequalities to
+  // be reduced
+  Matrix Ab(2, 2);
+  Ab << 1, 2,  //
+      3, 4;
+  Matrix Ab_exp(2, 2);
+  Ab_exp << -3.162277660168379, -4.427188724235731,  //
+      0, -0.632455532033676;
+
+  Matrix Cd(6, 2);
+  Cd << 1, 2,  // x < 2    (inactive)
+      -1, 3,   // x > -3   (inactive)
+      3, 4,    // x < 0.75 (inactive)
+      12, 6,   // x < 0.5  (active)
+      -5, -2,  // x > 0.4  (active)
+      1, 7;    // x < 7    (inactive)
+  Matrix Cd_exp(2, 2);
+  Cd_exp << 1, 0.5,  // x < 0.5
+      -1, -0.4;      // x > 0.4
+
+  RetimingFactor actual({0}, RetimingObjectives{}, Ab, Cd, true, false);
+  RetimingFactor expected({0}, RetimingObjectives{}, Ab_exp, Cd_exp, false,
+                          false);
+  EXPECT(expected.equals(actual, 1e-9));
+
+  // Infeasible equality constraint
+  CHECK_EXCEPTION(RetimingFactor({0}, RetimingObjectives{}, Ab, Cd, true, true),
+                  std::runtime_error);  // Infeasible
+  // Change Ab to be feasible
+  Ab << 1, 2, 5, 10;
+  Ab_exp << -5.099019513592785, -10.19803902718557, 0, 0;
+  actual = RetimingFactor({0}, RetimingObjectives{}, Ab, Cd, true, true);
+  expected =
+      RetimingFactor({0}, RetimingObjectives{}, Ab_exp, Cd_exp, false, false);
+  EXPECT(expected.equals(actual, 1e-9));
+
+  // Change Cd to be in-feasible
+  Cd.row(5) << 1, 0.3;
+  CHECK_EXCEPTION(RetimingFactor({0}, RetimingObjectives{}, Ab, Cd, true, true),
+                  std::runtime_error);  // Infeasible
 }
 
 /* ************************************************************************* */
