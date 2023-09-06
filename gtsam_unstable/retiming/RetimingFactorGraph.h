@@ -73,6 +73,27 @@ class GTSAM_EXPORT RetimingFactorGraph
   /** Default constructor */
   RetimingFactorGraph() {}
 
+  /**
+   * Construct from an initializer lists, e.g.,
+   *   RetimingFactorGraph graph = { factor1, factor2, factor3 };
+   */
+  RetimingFactorGraph(std::initializer_list<sharedFactor> factors)
+      : Base(factors) {}
+
+  /** Construct from iterator over factors */
+  template <typename ITERATOR>
+  RetimingFactorGraph(ITERATOR firstFactor, ITERATOR lastFactor)
+      : Base(firstFactor, lastFactor) {}
+
+  /** Construct from container of factors (shared_ptr or plain objects) */
+  template <class CONTAINER>
+  explicit RetimingFactorGraph(const CONTAINER& factors) : Base(factors) {}
+
+  /** Implicit copy/downcast constructor to override explicit template container
+   * constructor */
+  template <class DERIVEDFACTOR>
+  RetimingFactorGraph(const FactorGraph<DERIVEDFACTOR>& graph) : Base(graph) {}
+
   /// @}
 
   // Accumulate all the objectives/constraints

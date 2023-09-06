@@ -19,6 +19,7 @@
 
 #include <CppUnitLite/TestHarness.h>
 #include <gtsam/base/TestableAssertions.h>
+#include <gtsam/inference/Symbol.h>
 
 #include <gtsam_unstable/retiming/RetimingFactorGraph.h>
 #include <gtsam_unstable/retiming/RetimingFactor.h>
@@ -27,6 +28,7 @@
 
 using namespace std;
 using namespace gtsam;
+using gtsam::symbol_shorthand::X;
 
 Matrix LinConstr(std::initializer_list<double> a, double b) {
   Vector ret(a.size() + 1);
@@ -61,6 +63,44 @@ TEST(eliminate, eliminate_linear_equality) {
   CHECK(actual_joint);
   EXPECT(expected_cond->equals(*actual_cond, 1e-9));
   EXPECT(expected_joint->equals(*actual_joint, 1e-9));
+}
+
+/* ************************************************************************* */
+TEST(eliminate, eliminate_linear_equality_long) {
+  // x_{k+1} = 1.03 * x_{k}
+  // x_0 = 1.0
+  // Expect solution to be x_100 = 1.03^100 = 19.2186319809
+
+  RetimingFactorGraph factors;
+  for (int i = 0; i < 100; ++i) {
+    factors.push_back(
+        RetimingFactor::Equality({X(i), X(i + 1)}, LinConstr({1.03, -1}, 0.0)));
+  }
+  for (int i = 0; i <= 100; ++i) {
+    factors.push_back(
+        RetimingFactor::Inequality({X(i)}, LinConstr({1}, 100.0)));
+  }
+  traits<KeyVector>::Print(factors.keyVector(), "Keys");
+  auto sol = factors.eliminateSequential();
+  std::cout << sol << std::endl;
+  sol->print("Solution!");
+  std::cout << sol->at(100) << std::endl;
+
+  // auto [actual_cond, actual_joint] = EliminateRetiming(factors, {x});
+  // // Expect:
+  // // conditional: x = 0.2 - 2y - 3z, but actually this is just represented by
+  // // the same equality because it's trivial to solve
+  // // joint: (1 - 10y - 15z) + 6y <= 0.3
+  // //                   -4y - 15z <= -0.7
+
+  // auto expected_cond = factors.at(0);
+  // auto expected_joint =
+  //     RetimingFactor::Inequality({y, z}, LinConstr({-4, -15}, -0.7));
+
+  // CHECK(actual_cond);
+  // CHECK(actual_joint);
+  // EXPECT(expected_cond->equals(*actual_cond, 1e-9));
+  // EXPECT(expected_joint->equals(*actual_joint, 1e-9));
 }
 
 /* ************************************************************************* */

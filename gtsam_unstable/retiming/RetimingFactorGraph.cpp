@@ -2,7 +2,18 @@
 
 #include "RetimingFactorGraph.h"
 
+#include <gtsam/inference/EliminateableFactorGraph-inst.h>
+
+#include "RetimingFactor.h"
+#include "RetimingConditional.h"
+#include "RetimingBayesNet.h"
+#include "RetimingTrees.h"
+
 namespace gtsam {
+
+// Instantiate base classes
+template class FactorGraph<RetimingFactor>;
+template class EliminateableFactorGraph<RetimingFactorGraph>;
 
 using Linear = RetimingFactor::Linear;
 using Linears = RetimingFactor::Linears;
