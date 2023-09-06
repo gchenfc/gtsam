@@ -10,9 +10,9 @@
  * -------------------------------------------------------------------------- */
 
 /**
- *  @file   testLinearEquality.cpp
- *  @brief  Unit tests for LinearEquality
- *  @author Duy-Nguyen Ta
+ *  @file   testEliminateRetiming.cpp
+ *  @brief  Unit tests for retiming/eliminate.h
+ *  @author Gerry Chen
  **/
 
 #include <gtsam_unstable/retiming/eliminate.h>

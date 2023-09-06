@@ -74,18 +74,11 @@ class GTSAM_EXPORT RetimingFactorGraph
   RetimingFactorGraph() {}
 
   /// @}
-  /// @name Testable
-  /// @{
 
-  bool equals(const This& fg, double tol = 1e-9) const;
-
-  /// @}
-
-  /// Check exact equality.
-  friend bool operator==(const RetimingFactorGraph& lhs,
-                         const RetimingFactorGraph& rhs) {
-    return lhs.isEqual(rhs);
-  }
+  // Accumulate all the objectives/constraints
+  RetimingObjectives objectives() const;
+  RetimingFactor::Linears equalities() const;
+  RetimingFactor::Linears inequalities() const;
 };
 
 }  // namespace gtsam

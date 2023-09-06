@@ -12,19 +12,21 @@
 #include <gtsam/base/VectorSpace.h>  // traits for double
 #include <gtsam/inference/Factor.h>
 #include <gtsam/linear/GaussianFactor.h>
-#include "PiecewiseQuadratic.h"
+#include "RetimingObjective.h"
 #include "utils.h"
 
 namespace gtsam {
+
+class RetimingFactorGraph;
 
 class GTSAM_EXPORT RetimingFactor : public Factor {
  public:
   using shared_ptr = std::shared_ptr<RetimingFactor>;
   using This = RetimingFactor;
   using Linear = retiming::Linear;
-  using RetimingObjectives = std::vector<RetimingObjective>;
   using Linears = std::vector<Linear>;
 
+  // Constructors
   RetimingFactor(const KeyVector& keys, const RetimingObjectives& objectives,
                  const Linears& equality, const Linears& inequality)
       : Factor(keys),
@@ -32,9 +34,11 @@ class GTSAM_EXPORT RetimingFactor : public Factor {
         equalities_(equality),
         inequalities_(inequality) {}
 
+  RetimingFactor(const RetimingFactorGraph& factors);
+
   // Static convenience constructors
   static shared_ptr Objective(const KeyVector& keys,
-                              const PiecewiseQuadratic& objective) {
+                              const RetimingObjective& objective) {
     return std::make_shared<RetimingFactor>(keys, RetimingObjectives{objective},
                                             Linears{}, Linears{});
   }
@@ -47,6 +51,11 @@ class GTSAM_EXPORT RetimingFactor : public Factor {
     return std::make_shared<RetimingFactor>(keys, RetimingObjectives{},
                                             Linears{}, Linears{inequality});
   }
+
+  // Getters
+  const RetimingObjectives& objectives() const { return objectives_; }
+  const Linears& equalities() const { return equalities_; }
+  const Linears& inequalities() const { return inequalities_; }
 
   // Testable
   void print(

@@ -18,37 +18,26 @@ class PiecewiseQuadratic {
 
   // TODO(gerry): implementation
 
+  PiecewiseQuadratic rekey(const KeyVector& src_keys,
+                           const KeyVector& dest_keys) const {
+    std::cout << "Warning: Piecewise Quadratic not yet implemented"
+              << std::endl;
+    return *this;
+  }
+
   // Testable
   void print(const std::string& s = "Piecewise Quadratic",
              const KeyFormatter& formatter = DefaultKeyFormatter) const {
     std::cout << s << " unimplemented\n";
   }
   bool equals(const This& other, double tol = 1e-9) const {
-    throw std::runtime_error("Not implemented");
+    std::cout << "Warning: Piecewise Quadratic not yet implemented"
+              << std::endl;
+    return true;
   }
 };
 
 template <>
 struct traits<PiecewiseQuadratic> : public Testable<PiecewiseQuadratic> {};
-
-/// nullopt denotes "greedy" objective, GaussianFactor is a quadratic objective
-using RetimingObjective = std::optional<PiecewiseQuadratic>;
-
-// traits for Testable
-template <>
-struct traits<RetimingObjective> {
-  static void Print(const RetimingObjective& m,
-                    const std::string& str = "Objective") {
-    if (m)
-      m->print(str);
-    else
-      std::cout << str << " GREEDY\n";
-  }
-  static bool Equals(const RetimingObjective& m1, const RetimingObjective& m2,
-                     double tol = 1e-8) {
-    if (!m1) return !m2;
-    return m1->equals(*m2, tol);
-  }
-};
 
 }  // namespace gtsam
