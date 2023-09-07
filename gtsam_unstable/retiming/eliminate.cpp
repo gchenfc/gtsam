@@ -47,6 +47,11 @@ EliminateRetiming(const RetimingFactorGraph& factors, const Ordering& keys) {
     }
   }
 
+  // Next, check for 2-variable inequalities
+  if (ordering.size() == 2) {
+    // TODO(gerry): use LP solver to find the optimal solution
+  }
+
   // TODO(gerry): handle inequality and objective elimination
 
   return {nullptr, nullptr};
