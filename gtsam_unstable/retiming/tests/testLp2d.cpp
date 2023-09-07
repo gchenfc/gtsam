@@ -71,14 +71,49 @@ TEST(Lp2d, intersection) {
 }
 
 /* ************************************************************************* */
-TEST(Lp2d, extremals) {
-  // Example LP:
+TEST(Lp2d, is_feasible) {
+  // Example LP:  https://photos.app.goo.gl/FpafEDQe1iTT7qhJ8
   Inequalities inequalities(7, 3);
   inequalities << -1, 1, 0.5,  // y <= x + 0.5
       1, 1, 1,                 // y <= 1 - x
       -1, -1, -0.5,            // y >= 0.5 - x
       1. / 3, -1, 0,           // y >= x/3
-      0.5, 0, 0.5,             // x <= 0.5
+      1, 0, 0.5,               // x <= 0.5
+      -1, 0, 100,              // x >= -100
+      0, -1, 100;              // y >= -100
+
+  EXPECT(isFeasible(inequalities, Point(0.5, 0.5)));
+  EXPECT(isFeasible(inequalities, Point(0.2, 0.5)));
+  EXPECT(isFeasible(inequalities, Point(0.2, 0.65)));
+  EXPECT(isFeasible(inequalities, Point(0.3, 0.2)));
+  EXPECT(isFeasible(inequalities, Point(0.4, 0.4 / 3.)));
+  EXPECT(isFeasible(inequalities, Point(0.1, 0.4)));
+
+  EXPECT(!isFeasible(inequalities, Point(0.501, 0.5)));
+  EXPECT(!isFeasible(inequalities, Point(0.501, 0.48)));
+  EXPECT(!isFeasible(inequalities, Point(0.5, 0.501)));
+  EXPECT(!isFeasible(inequalities, Point(0.4, 0.601)));
+  EXPECT(!isFeasible(inequalities, Point(0.2, 0.701)));
+  EXPECT(!isFeasible(inequalities, Point(0.2, 0.299)));
+  EXPECT(!isFeasible(inequalities, Point(0.4, 0.132)));
+
+  EXPECT(isFeasible(inequalities, Point(0.5, 0.5)));
+  EXPECT(isFeasible(inequalities, Point(0.5, 0.48)));
+  EXPECT(isFeasible(inequalities, Point(0.4, 0.6)));
+  EXPECT(isFeasible(inequalities, Point(0.2, 0.7)));
+  EXPECT(isFeasible(inequalities, Point(0.2, 0.3)));
+  EXPECT(isFeasible(inequalities, Point(0.4, 0.400001 / 3.)));
+}
+
+/* ************************************************************************* */
+TEST(Lp2d, extremals) {
+  // Example LP:  https://photos.app.goo.gl/FpafEDQe1iTT7qhJ8
+  Inequalities inequalities(7, 3);
+  inequalities << -1, 1, 0.5,  // y <= x + 0.5
+      1, 1, 1,                 // y <= 1 - x
+      -1, -1, -0.5,            // y >= 0.5 - x
+      1. / 3, -1, 0,           // y >= x/3
+      1, 0, 0.5,               // x <= 0.5
       -1, 0, 100,              // x >= -100
       0, -1, 100;              // y >= -100
   // Sol for y: 0.375 <= y <= 0.75

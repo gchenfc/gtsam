@@ -27,5 +27,13 @@ Point intersection(const Inequality& line1, const Inequality& line2) {
 
 /******************************************************************************/
 
+bool isFeasible(const Inequalities& inequalities, const Point& point) {
+  return ((inequalities.leftCols<2>() * point.transpose()).array() <=
+          inequalities.col(2).array())
+      .all();
+}
+
+/******************************************************************************/
+
 }  // namespace lp2d
 }  // namespace gtsam
