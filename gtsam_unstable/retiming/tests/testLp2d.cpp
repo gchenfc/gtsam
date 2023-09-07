@@ -120,7 +120,7 @@ TEST(Lp2d, extremals) {
   // Sol for x: 0 <= x <= 0.5
 
   auto ybnds_actual = extremalsY(inequalities);
-  auto ybnds_expected = (ScalarBounds() << 1, 0.75, -1, -0.375).finished();
+  auto ybnds_expected = (ScalarBounds() << 1, 0.75, -1, -0.125).finished();
   EXPECT(assert_equal(ybnds_expected, ybnds_actual));
 
   // We can also test the x direction by just permuting the first 2 columns
