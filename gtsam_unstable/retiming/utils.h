@@ -12,6 +12,9 @@
 #include <gtsam/base/Testable.h>
 #include <gtsam/base/VectorSpace.h>  // traits for double
 
+// Use (void) to silence unused warnings.
+#define assertm(exp, msg) assert(((void)msg, exp))
+
 namespace gtsam {
 
 /// Values type for the retiming problem, which is a scalar problem

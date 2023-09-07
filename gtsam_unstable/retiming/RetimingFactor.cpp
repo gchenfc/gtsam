@@ -33,9 +33,8 @@ void RetimingFactor::removeRedundantEqualitiesInplace(
   if (checkForInfeasibility) {
     for (int r = Ab.rows() - 1; r >= 0; --r) {
       if ((Ab.row(r).head(Ab.cols() - 1).array().abs() < 1e-12).all()) {
-        if (abs(Ab(r, Ab.cols() - 1)) >= 1e-12) {
-          throw std::runtime_error("Infeasible");
-        }
+        assertm(abs(Ab(r, Ab.cols() - 1)) < 1e-12,
+                "Infeasible due to equality");
       } else {
         break;  // No more zero rows
       }
@@ -47,8 +46,7 @@ void RetimingFactor::removeRedundantEqualitiesInplace(
 
 void RetimingFactor::removeRedundantInequalitiesInplace(Matrix& inequalities) {
   if (inequalities.cols() == 1) {
-    if ((inequalities.array() < 0).any())
-      throw std::runtime_error("Infeasible");
+    assertm((inequalities.array() >= 0).all(), "Infeasible due to inequality");
   } else if (inequalities.cols() == 2) {
     // Scalar inequalities, just find lower and upper bound
     double lower_bound = std::numeric_limits<double>::lowest(),
@@ -63,7 +61,7 @@ void RetimingFactor::removeRedundantInequalitiesInplace(Matrix& inequalities) {
         // do nothing
       }
     }
-    if (lower_bound > upper_bound) throw std::runtime_error("Infeasible");
+    assertm(lower_bound <= upper_bound, "Infeasible due to inequalities");
 
     bool has_lower = (lower_bound != std::numeric_limits<double>::lowest()),
          has_upper = (upper_bound != std::numeric_limits<double>::max());

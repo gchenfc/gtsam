@@ -60,7 +60,7 @@ Point intersection(const Inequality& line1, const Inequality& line2,
                /**/ &c = line2(0), &d = line2(1), &e2 = line2(2);
 
   double det = a * d - b * c;
-  if (abs(det) < parallel_tol) throw std::runtime_error("Lines are parallel");
+  assert(abs(det) >= parallel_tol && "Lines are parallel");
 
   return Point(d * e1 - b * e2, -c * e1 + a * e2) / det;
 }
