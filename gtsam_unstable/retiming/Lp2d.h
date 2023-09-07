@@ -22,6 +22,9 @@ using Point = Eigen::Matrix<double, 1, 2>;
 
 /// @brief Compute the lower and upper bounds on the second variable, returned
 /// in the form [1, upperBound; -1, -lowerBound]
+/// Uses a naive algorithm of calculating every possible intersection point
+/// between pairwise inequalities, checking if they're feasible, and taking the
+/// min/max.
 Inequalities extremalsY(const Inequalities& inequalities);
 
 /// @brief Compute the upper bound on the second variable
