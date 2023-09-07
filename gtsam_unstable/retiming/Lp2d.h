@@ -18,6 +18,9 @@ namespace lp2d {
 // inequalities are represented by an Nx3 matrix.
 using Inequality = Eigen::Matrix<double, 1, 3>;
 using Inequalities = Eigen::Matrix<double, Eigen::Dynamic, 3>;
+// Scalar inequalities take the form [a, b] where ax <= b, so 2 (forming a
+// bound) would be a 2x2 matrix
+using ScalarBounds = Eigen::Matrix<double, 2, 2>;
 using Point = Eigen::Matrix<double, 1, 2>;
 
 /// @brief Compute the lower and upper bounds on the second variable, returned
@@ -25,7 +28,7 @@ using Point = Eigen::Matrix<double, 1, 2>;
 /// Uses a naive algorithm of calculating every possible intersection point
 /// between pairwise inequalities, checking if they're feasible, and taking the
 /// min/max.
-Inequalities extremalsY(const Inequalities& inequalities);
+ScalarBounds extremalsY(const Inequalities& inequalities);
 
 /// @brief Compute the upper bound on the second variable
 double argmaxY(const Inequalities& inequalities) {

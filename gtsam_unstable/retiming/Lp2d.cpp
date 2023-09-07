@@ -5,8 +5,8 @@ namespace lp2d {
 
 /******************************************************************************/
 
-Inequalities extremalsY(const Inequalities& inequalities) {
-  return (Inequalities() << 1, 0, -1, 0).finished();  //
+ScalarBounds extremalsY(const Inequalities& inequalities) {
+  return (ScalarBounds() << 1, 0, -1, 0).finished();  //
 }
 
 /******************************************************************************/

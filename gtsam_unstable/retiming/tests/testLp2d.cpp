@@ -71,8 +71,30 @@ TEST(Lp2d, intersection) {
 }
 
 /* ************************************************************************* */
-TEST(eliminate, extremals) {
-  //
+TEST(Lp2d, extremals) {
+  // Example LP:
+  Inequalities inequalities(7, 3);
+  inequalities << -1, 1, 0.5,  // y <= x + 0.5
+      1, 1, 1,                 // y <= 1 - x
+      -1, -1, -0.5,            // y >= 0.5 - x
+      1. / 3, -1, 0,           // y >= x/3
+      0.5, 0, 0.5,             // x <= 0.5
+      -1, 0, 100,              // x >= -100
+      0, -1, 100;              // y >= -100
+  // Sol for y: 0.375 <= y <= 0.75
+  // Sol for x: 0 <= x <= 0.5
+
+  auto ybnds_actual = extremalsY(inequalities);
+  auto ybnds_expected = (ScalarBounds() << 1, 0.75, -1, -0.375).finished();
+  EXPECT(assert_equal(ybnds_expected, ybnds_actual));
+
+  // We can also test the x direction by just permuting the first 2 columns
+  Inequalities inequalities_x(7, 3);
+  inequalities_x << inequalities.col(1), inequalities.col(0),
+      inequalities.col(2);
+  auto xbnds_actual = extremalsY(inequalities_x);
+  auto xbnds_expected = (ScalarBounds() << 1, 0.5, -1, 0.0).finished();
+  EXPECT(assert_equal(ybnds_expected, ybnds_actual));
 }
 
 /* ************************************************************************* */
