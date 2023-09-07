@@ -94,7 +94,40 @@ TEST(eliminate, eliminate_linear_equality_long) {
 }
 
 /* ************************************************************************* */
-TEST(eliminate, eliminate_linear_inequality) {
+TEST(eliminate, eliminate_linear_inequality1) {
+  Key x = 0, y = 1;
+
+  // 5x + 6y     <= 30.0
+  // -1x         <= 0
+  //    - 1y     <= 0
+  RetimingFactorGraph factors;
+  factors.push_back(
+      RetimingFactor::Inequality({x, y}, LinConstr({5, 6}, 30.0)));
+  factors.push_back(RetimingFactor::Inequality({x}, LinConstr({-1}, 0.0)));
+  factors.push_back(RetimingFactor::Inequality({y}, LinConstr({-1}, 0.0)));
+
+  auto [actual_cond, actual_joint] = EliminateRetiming(factors, {y});
+
+  // Expect:
+  // conditional: lazy eval:  5x + 6y <= 30.0
+  //                          -1x     <= 0
+  //                             - 1y <= 0
+  // joint: 0 <= x <= 6.0
+  RetimingFactorGraph exp_cond(factors);
+  auto expected_cond = RetimingFactor(exp_cond, {y, x});
+  Matrix joint_ineq(2, 2);
+  joint_ineq << LinConstr({-1}, 0.0), LinConstr({1}, 6.0);
+  auto expected_joint =
+      RetimingFactor({x}, RetimingObjectives{}, Matrix::Zero(0, 2), joint_ineq);
+
+  CHECK(actual_cond);
+  CHECK(actual_joint);
+  EXPECT(expected_cond.equals(*actual_cond, 1e-9));
+  EXPECT(expected_joint.equals(*actual_joint, 1e-9));
+}
+
+/* ************************************************************************* */
+TEST(eliminate, eliminate_linear_inequality_edge_case) {
   Key x = 0, y = 1, z = 2;
 
   // 1x + 0y + 3z = 0.2
@@ -119,9 +152,9 @@ TEST(eliminate, eliminate_linear_inequality) {
   //        0 <= x <= 6.0
   RetimingFactorGraph exp_cond;
   exp_cond += factors.at(1), factors.at(2), factors.at(3);
-  auto expected_cond = RetimingFactor(exp_cond);
+  auto expected_cond = RetimingFactor(exp_cond, {y, x});
   Matrix joint_ineq(2, 3);
-  joint_ineq << LinConstr({-1, 0}, 0.0), LinConstr({1, 0}, 6.0);
+  joint_ineq << LinConstr({1, 0}, 6.0), LinConstr({-1, 0}, 0.0);
   auto expected_joint = RetimingFactor({x, z}, RetimingObjectives{},
                                        LinConstr({1, 3}, 0.2), joint_ineq);
 

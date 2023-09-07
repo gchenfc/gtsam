@@ -31,17 +31,18 @@ using Point = Eigen::Matrix<double, 1, 2>;
 ScalarBounds extremalsY(const Inequalities& inequalities);
 
 /// @brief Compute the upper bound on the second variable
-double argmaxY(const Inequalities& inequalities) {
+inline double argmaxY(const Inequalities& inequalities) {
   return extremalsY(inequalities)(0, 1);
 }
 
 /// @brief Compute the lower bound on the second variable
-double argminY(const Inequalities& inequalities) {
+inline double argminY(const Inequalities& inequalities) {
   return -extremalsY(inequalities)(1, 1);
 }
 
 /// @brief Compute the intersection of 2 lines
-Point intersection(const Inequality& line1, const Inequality& line2, double parallel_tol = 1e-12);
+Point intersection(const Inequality& line1, const Inequality& line2,
+                   double parallel_tol = 1e-12);
 
 /// @brief Checks whether a point satisfies the inequalities
 bool isFeasible(const Inequalities& inequalities, const Point& point);

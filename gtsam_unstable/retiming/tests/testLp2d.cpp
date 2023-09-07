@@ -129,7 +129,7 @@ TEST(Lp2d, extremals) {
       inequalities.col(2);
   auto xbnds_actual = extremalsY(inequalities_x);
   auto xbnds_expected = (ScalarBounds() << 1, 0.5, -1, 0.0).finished();
-  EXPECT(assert_equal(ybnds_expected, ybnds_actual));
+  EXPECT(assert_equal(xbnds_expected, xbnds_actual));
 }
 
 /* ************************************************************************* */

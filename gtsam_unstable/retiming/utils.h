@@ -100,9 +100,14 @@ struct LinearConstraint {
   /// Erase one row of a matrix
   static Matrix dropRow(const Matrix& src, const int row) {
     Matrix result(src.rows() - 1, src.cols());
-    result.topRows(row) = src.topRows(row);
-    result.bottomRows(src.rows() - row - 1) =
-        src.bottomRows(src.rows() - row - 1);
+    result << src.topRows(row), src.bottomRows(src.rows() - row - 1);
+    return result;
+  }
+
+  /// Erase one column of a matrix
+  static Matrix dropCol(const Matrix& src, const int col) {
+    Matrix result(src.rows(), src.cols() - 1);
+    result << src.leftCols(col), src.rightCols(src.cols() - col - 1);
     return result;
   }
 
