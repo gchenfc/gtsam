@@ -83,6 +83,24 @@ void RetimingFactor::removeRedundantInequalitiesInplace(Matrix& inequalities) {
 
 /******************************************************************************/
 
+void RetimingFactor::normalizeEqualitiesInplace(Matrix& equalities) {
+  for (auto row : equalities.rowwise()) {  // rowwise gives mutable refs
+    const double& amt = row.head(row.size() - 1).maxCoeff();
+    row /= amt;
+  }
+}
+
+/******************************************************************************/
+
+void RetimingFactor::normalizeInequalitiesInplace(Matrix& inequalities) {
+  for (auto row : inequalities.rowwise()) {  // rowwise gives mutable refs
+    const double& amt = row.head(row.size() - 1).maxCoeff();
+    row /= abs(amt);
+  }
+}
+
+/******************************************************************************/
+
 RetimingFactor::shared_ptr RetimingFactor::substitute(
     const size_t& keyIndex, const Linear& equality) const {
   RetimingFactor::shared_ptr result = std::make_shared<RetimingFactor>(

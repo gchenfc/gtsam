@@ -45,7 +45,7 @@ Point intersection(const Inequality& line1, const Inequality& line2,
                    double parallel_tol = 1e-12);
 
 /// @brief Checks whether a point satisfies the inequalities
-bool isFeasible(const Inequalities& inequalities, const Point& point);
+bool isFeasible(const Inequalities& inequalities, const Point& point, double tol = 1e-12);
 
 }  // namespace lp2d
 }  // namespace gtsam

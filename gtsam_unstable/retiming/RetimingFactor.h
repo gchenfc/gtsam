@@ -79,6 +79,12 @@ class GTSAM_EXPORT RetimingFactor : public Factor {
   /// Remove redundant inequality constraints if only 1 variable is involved
   static void removeRedundantInequalitiesInplace(Matrix& inequalities);
 
+  /// Normalize equality constraints by dividing by largest coefficients
+  static void normalizeEqualitiesInplace(Matrix& equalities);
+
+  /// Normalize inequality constraints by dividing by abs(largest coefficients)
+  static void normalizeInequalitiesInplace(Matrix& inequalities);
+
   // Getters
   const RetimingObjectives& objectives() const { return objectives_; }
   const Linears& equalities() const { return equalities_; }

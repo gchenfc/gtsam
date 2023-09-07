@@ -28,6 +28,7 @@
 
 using namespace std;
 using namespace gtsam;
+using gtsam::symbol_shorthand::U;
 using gtsam::symbol_shorthand::X;
 
 Matrix LinConstr(std::initializer_list<double> a, double b) {
@@ -162,6 +163,112 @@ TEST(eliminate, eliminate_linear_inequality_edge_case) {
   CHECK(actual_joint);
   EXPECT(expected_cond.equals(*actual_cond, 1e-9));
   EXPECT(expected_joint.equals(*actual_joint, 1e-9));
+}
+
+/* ************************************************************************* */
+TEST(eliminate, eliminate_inequality_long) {
+  // x_{k+1} <= 1.03 * x_{k}
+  // x_0 = 1.0
+  // Expect solution to be x_100 = 1.03^100 = 19.2186319809
+
+  RetimingFactorGraph factors;
+  for (int i = 0; i < 100; ++i) {
+    factors.push_back(RetimingFactor::Inequality({X(i), X(i + 1)},
+                                                 LinConstr({-1.03, 1}, 0.0)));
+  }
+  factors.push_back(RetimingFactor::Equality({X(0)}, LinConstr({1}, 1.0)));
+
+  auto sol = factors.eliminateSequential();
+  CHECK(sol);
+  auto actual_x100 = sol->at(100);
+  CHECK(actual_x100);
+
+  auto expected_x100 =
+      RetimingConditional::Inequality({X(100)}, LinConstr({1}, 19.2186319809));
+  EXPECT_LONGS_EQUAL(101, sol->size());
+  EXPECT(expected_x100->equals(*sol->at(100), 1e-9));
+
+  // sol->print("Bayes Net:");
+  // actual_x100->print("Final Conditional (Act):");
+  // expected_x100->print("Final Conditional (Exp):");
+}
+
+/* ************************************************************************* */
+TEST(eliminate, eliminate_control_limited_dynamics) {
+  // System Dynamics:
+  //    x_{k+1} = 0.98 * x_k + 0.5 * u_k
+  //    x_0 = 1.0
+  //    x_1 <= 0.3
+  //    u_k + x_k <= 0.1
+  //
+  // Expect solution to be:
+  //    x0 = 1.0, u0 = -1.36  // So that x1 = 0.3
+  //    x1 = 0.3, u1 = -0.2
+  //    x2 = 0.194, u2 = -0.094
+  //    x3 = 0.14312, u3 = -0.04312
+  //    ...
+  //    xinf = 0.1 / 1.04 = 0.09615384615, uinf = -0.00384615385
+
+  RetimingFactorGraph factors;
+  for (int i = 0; i < 100; ++i) {
+    factors.push_back(RetimingFactor::Equality(
+        {X(i + 1), X(i), U(i)}, LinConstr({-1.0, 0.98, 0.5}, 0.0)));
+    factors.push_back(
+        RetimingFactor::Inequality({U(i), X(i)}, LinConstr({1, 1}, 0.1)));
+  }
+  factors.push_back(RetimingFactor::Equality({X(0)}, LinConstr({1}, 1.0)));
+  factors.push_back(RetimingFactor::Inequality({X(1)}, LinConstr({1}, 0.3)));
+
+  Ordering ordering;
+  for (int i = 0; i < 100; ++i) {
+    ordering.push_back(U(i));
+  }
+  for (int i = 0; i <= 100; ++i) {
+    ordering.push_back(X(i));
+  }
+  auto bn = factors.eliminateSequential();  // COLAMD
+  CHECK(bn);
+  auto sol = bn->optimize();
+  auto bn1 = factors.eliminateSequential(ordering);
+  CHECK(bn1);
+  auto sol1 = bn1->optimize();
+
+  // Print Solution nicely
+  // auto printSol = [](const ScalarValues& sol) {
+  //   for (int i = 0; i < 100; ++i) {
+  //     std::cout << "\tx" << i << " = " << sol.at(X(i)) << ", u" << i << " = "
+  //               << sol.at(U(i)) << "\n";
+  //   }
+  //   std::cout << "\tx100 = " << sol.at(X(100)) << "\n";
+  // };
+  // bn->print("Bayes Net:");
+  // traits<ScalarValues>::Print(sol, "SOLUTION:");
+  // printSol(sol);
+  // bn1->print("Bayes Net:");
+  // traits<ScalarValues>::Print(sol1, "SOLUTION:");
+  // printSol(sol1);
+
+  EXPECT_DOUBLES_EQUAL(1.0, sol.at(X(0)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(-1.36, sol.at(U(0)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.3, sol.at(X(1)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(-0.2, sol.at(U(1)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.194, sol.at(X(2)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(-0.094, sol.at(U(2)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.14312, sol.at(X(3)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(-0.04312, sol.at(U(3)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.09615384615, sol.at(X(100)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.00384615385, sol.at(U(99)), 1e-9);
+
+  EXPECT_DOUBLES_EQUAL(1.0, sol1.at(X(0)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(-1.36, sol1.at(U(0)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.3, sol1.at(X(1)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(-0.2, sol1.at(U(1)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.194, sol1.at(X(2)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(-0.094, sol1.at(U(2)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.14312, sol1.at(X(3)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(-0.04312, sol1.at(U(3)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.09615384615, sol1.at(X(100)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.00384615385, sol1.at(U(99)), 1e-9);
 }
 
 /* ************************************************************************* */

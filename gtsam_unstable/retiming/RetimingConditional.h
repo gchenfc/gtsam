@@ -55,8 +55,8 @@ class GTSAM_EXPORT RetimingConditional
    */
   double logNormalizationConstant() const override { return 0.0; };
 
-  // TODO!!!
-  ScalarValues solve(const ScalarValues& parents) { return {{0, 0.0}}; }
+  /// Returns the optimal value of the frontal given the values of the parents
+  double solve(const ScalarValues& parents);
 
   // Testable
   void print(

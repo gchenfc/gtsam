@@ -34,7 +34,15 @@ EliminateRetiming(const RetimingFactorGraph& factors, const Ordering& keys) {
   // Collect all the objectives/constraints into a single factor
   RetimingFactor factor(factors, ordering);
 
-  // First check if there are any equalities that can be used for elimination
+  // First the trivial case
+  if (ordering.size() == 1) {
+    RetimingFactor::normalizeEqualitiesInplace(factor.equalities());
+    RetimingFactor::normalizeInequalitiesInplace(factor.inequalities());
+    return {/*Conditional*/ std::make_shared<RetimingConditional>(factor),
+            /*   Joint   */ nullptr};
+  }
+
+  // Second check if there are any equalities that can be used for elimination
   const auto& equalities = factor.equalities();
   if (equalities.leftCols<1>().any()) {
     // Gauss-Jordan elimination on the first column
@@ -51,7 +59,7 @@ EliminateRetiming(const RetimingFactorGraph& factors, const Ordering& keys) {
     }
   }
 
-  // Next, check for 2-variable inequalities
+  // Third, check for 2-variable inequalities
   if (ordering.size() == 2) {
     return Eliminate2Vars2Inequalities(factor, ordering);
   }
@@ -103,6 +111,7 @@ GTSAM_EXPORT std::pair<std::shared_ptr<RetimingConditional>,
                        std::shared_ptr<RetimingFactor>>
 EliminateManyVars2Inequalities(const RetimingFactor& factor,
                                KeyVector& ordering) {
+  static constexpr int col_index = 0;
   const auto& Ab = factor.inequalities();
 
   // Make sure all objectives are greedy
