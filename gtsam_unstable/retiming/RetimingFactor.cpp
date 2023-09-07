@@ -44,7 +44,8 @@ void RetimingFactor::removeRedundantEqualitiesInplace(
 
 /******************************************************************************/
 
-void RetimingFactor::removeRedundantInequalitiesInplace(Matrix& inequalities) {
+void RetimingFactor::removeRedundantInequalitiesInplace(
+    Matrix& inequalities, double infeasibilityTol) {
   if (inequalities.cols() == 1) {
     assertm((inequalities.array() >= 0).all(), "Infeasible due to inequality");
   } else if (inequalities.cols() == 2) {
@@ -61,7 +62,8 @@ void RetimingFactor::removeRedundantInequalitiesInplace(Matrix& inequalities) {
         // do nothing
       }
     }
-    assertm(lower_bound <= upper_bound, "Infeasible due to inequalities");
+    assertm(lower_bound <= upper_bound + infeasibilityTol,
+            "Infeasible due to inequalities");
 
     bool has_lower = (lower_bound != std::numeric_limits<double>::lowest()),
          has_upper = (upper_bound != std::numeric_limits<double>::max());

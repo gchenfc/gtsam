@@ -77,7 +77,8 @@ class GTSAM_EXPORT RetimingFactor : public Factor {
       Matrix& equalities, bool checkForInfeasibility = true);
 
   /// Remove redundant inequality constraints if only 1 variable is involved
-  static void removeRedundantInequalitiesInplace(Matrix& inequalities);
+  static void removeRedundantInequalitiesInplace(
+      Matrix& inequalities, double infeasibilityTol = 1e-16);
 
   /// Normalize equality constraints by dividing by largest coefficients
   static void normalizeEqualitiesInplace(Matrix& equalities);

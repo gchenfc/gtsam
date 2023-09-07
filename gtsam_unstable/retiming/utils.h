@@ -12,13 +12,7 @@
 #include <gtsam/base/Testable.h>
 #include <gtsam/base/VectorSpace.h>  // traits for double
 
-// Use (void) to silence unused warnings.
-// TODO(gerry): migrate back to if (!cond) throw runtime_error
-#ifdef NDEBUG
-#define assertm(exp, msg) (void)(exp)
-#else
-#define assertm(exp, msg) assert(((void)msg, exp))
-#endif
+#include "assert.h"
 
 namespace gtsam {
 

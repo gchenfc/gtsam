@@ -63,11 +63,11 @@ TEST(Lp2d, intersection) {
 
   // Bad cases
   CHECK_EXCEPTION(intersection(Inequality(1, 0, 0), Inequality(1, 0, 0)),
-                  runtime_error);  // colinear
+                  std::runtime_error);  // colinear
   CHECK_EXCEPTION(intersection(Inequality(1, 2, 8), Inequality(0.5, 1, 10)),
-                  runtime_error);  // parallel
+                  std::runtime_error);  // parallel
   CHECK_EXCEPTION(intersection(Inequality(0, 0, 0), Inequality(1, 0, 0)),
-                  runtime_error);  // not a line
+                  std::runtime_error);  // not a line
 }
 
 /* ************************************************************************* */
