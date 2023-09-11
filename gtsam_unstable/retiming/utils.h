@@ -78,9 +78,17 @@ struct LinearConstraint {
   using Linear = Eigen::Matrix<double, 1, Eigen::Dynamic>;
   using Linears = Matrix;
 
-  /// Extract A, b from augmented matrix
-  static Matrix getA(Matrix& src) { return src.leftCols(src.cols() - 1); }
-  static Vector getb(Matrix& src) { return src.rightCols<1>(); }
+// Constructors
+static Linear Create(std::initializer_list<double> a, double b) {
+  Linear ret(a.size() + 1);
+  std::copy(a.begin(), a.end(), ret.begin());
+  ret(a.size()) = b;
+  return ret;
+}
+
+/// Extract A, b from augmented matrix
+static Matrix getA(Matrix& src) { return src.leftCols(src.cols() - 1); }
+static Vector getb(Matrix& src) { return src.rightCols<1>(); }
 
   /// Rekey the linear constraint by transposing the columns
   static Matrix rekey(const Matrix& src, const KeyVector& src_keys,

@@ -209,8 +209,10 @@ TEST(eliminate, eliminate_control_limited_dynamics) {
   //    ...
   //    xinf = 0.1 / 1.04 = 0.09615384615, uinf = -0.00384615385
 
+  static constexpr int N = 100;
+
   RetimingFactorGraph factors;
-  for (int i = 0; i < 100; ++i) {
+  for (int i = 0; i < N; ++i) {
     factors.push_back(RetimingFactor::Equality(
         {X(i + 1), X(i), U(i)}, LinConstr({-1.0, 0.98, 0.5}, 0.0)));
     factors.push_back(
@@ -220,10 +222,10 @@ TEST(eliminate, eliminate_control_limited_dynamics) {
   factors.push_back(RetimingFactor::Inequality({X(1)}, LinConstr({1}, 0.3)));
 
   Ordering ordering;
-  for (int i = 0; i < 100; ++i) {
+  for (int i = 0; i < N; ++i) {
     ordering.push_back(U(i));
   }
-  for (int i = 0; i <= 100; ++i) {
+  for (int i = 0; i <= N; ++i) {
     ordering.push_back(X(i));
   }
   auto bn = factors.eliminateSequential();  // COLAMD
@@ -235,11 +237,11 @@ TEST(eliminate, eliminate_control_limited_dynamics) {
 
   // Print Solution nicely
   // auto printSol = [](const ScalarValues& sol) {
-  //   for (int i = 0; i < 100; ++i) {
+  //   for (int i = 0; i < N; ++i) {
   //     std::cout << "\tx" << i << " = " << sol.at(X(i)) << ", u" << i << " = "
   //               << sol.at(U(i)) << "\n";
   //   }
-  //   std::cout << "\tx100 = " << sol.at(X(100)) << "\n";
+  //   std::cout << "\txN = " << sol.at(X(N)) << "\n";
   // };
   // bn->print("Bayes Net:");
   // traits<ScalarValues>::Print(sol, "SOLUTION:");
@@ -256,8 +258,8 @@ TEST(eliminate, eliminate_control_limited_dynamics) {
   EXPECT_DOUBLES_EQUAL(-0.094, sol.at(U(2)), 1e-9);
   EXPECT_DOUBLES_EQUAL(0.14312, sol.at(X(3)), 1e-9);
   EXPECT_DOUBLES_EQUAL(-0.04312, sol.at(U(3)), 1e-9);
-  EXPECT_DOUBLES_EQUAL(0.09615384615, sol.at(X(100)), 1e-9);
-  EXPECT_DOUBLES_EQUAL(0.00384615385, sol.at(U(99)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.09615384615, sol.at(X(N)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.00384615385, sol.at(U(N - 1)), 1e-9);
 
   EXPECT_DOUBLES_EQUAL(1.0, sol1.at(X(0)), 1e-9);
   EXPECT_DOUBLES_EQUAL(-1.36, sol1.at(U(0)), 1e-9);
@@ -267,8 +269,8 @@ TEST(eliminate, eliminate_control_limited_dynamics) {
   EXPECT_DOUBLES_EQUAL(-0.094, sol1.at(U(2)), 1e-9);
   EXPECT_DOUBLES_EQUAL(0.14312, sol1.at(X(3)), 1e-9);
   EXPECT_DOUBLES_EQUAL(-0.04312, sol1.at(U(3)), 1e-9);
-  EXPECT_DOUBLES_EQUAL(0.09615384615, sol1.at(X(100)), 1e-9);
-  EXPECT_DOUBLES_EQUAL(0.00384615385, sol1.at(U(99)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.09615384615, sol1.at(X(N)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.00384615385, sol1.at(U(N - 1)), 1e-9);
 }
 
 /* ************************************************************************* */

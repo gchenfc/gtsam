@@ -10,6 +10,20 @@ namespace lp2d {
 /******************************************************************************/
 
 ScalarBounds extremalsY(const Inequalities& inequalities) {
+  // TODO(gerry): Here's a simplex-like algorithm that might be more efficient:
+  //    When we determine a vertex in infeasible, instead of just checking the
+  //    next vertex (exhaustivly), instead the next vertex to try should be
+  //    the intersection of (a line) with (the inequality/line that caused the
+  //    infeasibility check to fail).
+  //    "a line" may have to generate a vertex to try for both lines, and take
+  //    either which satisfies all 3 constraints (or all the constraints we've
+  //    seen so far?).
+  //    Repeat until we get a feasible point.
+  //    Once we get a feasible point, traverse upwards (or downwards) until we
+  //    find the extremal.
+  // I suspect this is not more efficient because all the extra book-keeping &
+  // branch mis-prediction isn't worth it for the small number of inequalities
+  // we have.
   ScalarBounds bounds = ScalarBounds::Zero();
 
   // Loop over every unique pair of inequalities

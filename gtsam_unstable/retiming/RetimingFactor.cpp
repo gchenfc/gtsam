@@ -7,17 +7,19 @@ namespace gtsam {
 RetimingFactor::RetimingFactor(const RetimingFactorGraph& factors,
                                bool removeRedundantConstraints,
                                bool checkForInfeasibility)
-    : RetimingFactor(factors, factors.keyVector(), removeRedundantConstraints,
-                     checkForInfeasibility) {}
+    : RetimingFactor{factors, factors.keyVector(), removeRedundantConstraints,
+                     checkForInfeasibility} {}
 
 RetimingFactor::RetimingFactor(const RetimingFactorGraph& factors,
                                const KeyVector& ordering,
                                bool removeRedundantConstraints,
                                bool checkForInfeasibility)
-    : RetimingFactor(ordering, factors.objectives(ordering),
+    : RetimingFactor{ordering,
+                     factors.objectives(ordering),
                      factors.equalities(ordering),
-                     factors.inequalities(ordering), removeRedundantConstraints,
-                     checkForInfeasibility) {}
+                     factors.inequalities(ordering),
+                     removeRedundantConstraints,
+                     checkForInfeasibility} {}
 
 /******************************************************************************/
 
