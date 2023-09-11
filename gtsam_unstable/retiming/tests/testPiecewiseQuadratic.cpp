@@ -61,6 +61,45 @@ TEST(PiecewiseQuadratic, evaluate2) {
 }
 
 /* ************************************************************************* */
+TEST(PiecewiseQuadratic, sum) {
+  PiecewiseQuadratic q1, q2;
+  {
+    Vec a{1, 2, 3};
+    Vec b{4, 5, 6};
+    Vec c{7, 8, 9};
+    Vec d{1.1, 1.2, 1.3};
+    Vec e{0.6, 0.5, 0.4};
+    Vec f{0.3, 0.2, 0.1};
+    Vec xc{10, 11};
+    q1 = PiecewiseQuadratic(a, b, c, d, e, f, xc);
+  }
+  {
+    Vec a{9, 8, 0.1};
+    Vec b{1.3, 1.4, 1.9};
+    Vec c{0.2, 0.3, 0.4};
+    Vec d{0.5, 0.6, 0.7};
+    Vec e{0.8, 0.9, 1.0};
+    Vec f{1.1, 1.2, 1.3};
+    Vec xc{4, 10.5};
+    q2 = PiecewiseQuadratic(a, b, c, d, e, f, xc);
+  }
+
+  auto q3_actual = PiecewiseQuadratic({q1, q2});
+
+  // Now check that q_of_y(y) evaluates to the same as q(x_of_y(y), y)
+  auto test_with_xy = [&](double x, double y) {
+    EXPECT_DOUBLES_EQUAL(q1.evaluate(x, y) + q2.evaluate(x, y),
+                         q3_actual.evaluate(x, y), 1e-9);
+  };
+
+  for (double x = 3.1; x < 12.5; x += 0.5) {
+    for (double y = 0, y < 12, y += 0.75) {
+      test_with_xy(x, y);
+    }
+  }
+}
+
+/* ************************************************************************* */
 TEST(PiecewiseQuadratic, substitute) {
   Vec a{1, 2, 3};
   Vec b{4, 5, 6};

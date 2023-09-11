@@ -33,7 +33,8 @@ TEST(PiecewiseQuadratic, evaluate1) {
       4.0, 5.0, 4.0,        //
       -1.0, -2.0, 5.0,      //
       0.0, 0.0, 9999999;
-  PiecewiseLinear l(m_b_xc.col(0), m_b_xc.col(1), m_b_xc.col(2));
+  PiecewiseLinear l{
+      .m = m_b_xc.col(0), .b = m_b_xc.col(1), .xc = m_b_xc.col(2)};
 
   EXPECT_DOUBLES_EQUAL(2.0, l.evaluate(0.0), 1e-9);
   EXPECT_DOUBLES_EQUAL(4.9, l.evaluate(2.9), 1e-9);

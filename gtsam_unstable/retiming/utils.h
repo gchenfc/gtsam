@@ -11,6 +11,7 @@
 
 #include <gtsam/base/Testable.h>
 #include <gtsam/base/VectorSpace.h>  // traits for double
+#include <gtsam/inference/Symbol.h>
 
 #include "assert.h"
 

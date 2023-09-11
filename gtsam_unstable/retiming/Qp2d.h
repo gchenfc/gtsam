@@ -28,7 +28,7 @@ using Bounds1d = Inequalities;
 /// @return the optimal value of the first variable as a function of the second
 PiecewiseLinear argmin(const PiecewiseQuadratic& objective,
                        const Inequalities& inequalities,
-                       Bounds1d* bounds_on_argument = nullptr) const;
+                       Bounds1d* bounds_on_argument = nullptr);
 
 }  // namespace qp2d
 }  // namespace gtsam
