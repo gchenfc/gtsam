@@ -28,6 +28,35 @@ namespace gtsam {
 struct RetimingObjective;
 
 /**
+ * @brief A piecewise quadratic of 1 variable
+ *
+ * Parameterized by: f(x) = a.x^2 + b.x + c
+ * a, b, c are stacked into an (n,3) matrix C, and xc is a vector of size (n-1)
+ * denoting the x-coordinates of the segment boundaries
+ */
+struct PiecewiseQuadratic1d {
+  Eigen::Matrix<double, Eigen::Dynamic, 3> C;
+  Eigen::VectorXd xc;
+
+  /// @brief Evaluate the piecewise quadratic at a point x
+  double evaluate(double x) {
+    auto i =
+        std::distance(xc.begin(), std::upper_bound(xc.begin(), xc.end(), x));
+    return C(i, 0) * x * x + C(i, 1) * x + C(i, 2);
+  }
+
+  // Testable
+  void print(const std::string& s = "Piecewise Quadratic 1d",
+             const KeyFormatter& formatter = DefaultKeyFormatter) const {
+    std::cout << s << "C:\n" << C << "\nxc:\n" << xc << std::endl;
+  }
+  bool equals(const PiecewiseQuadratic1d& other, double tol = 1e-9) const {
+    return traits<decltype(C)>::Equals(C, other.C, tol) &&
+           traits<decltype(xc)>::Equals(xc, other.xc, tol);
+  }
+};
+
+/**
  * @brief A piecewise quadratic used to define objectives.
  *
  * The following representation is used for a quadratic:
@@ -57,6 +86,9 @@ class PiecewiseQuadratic {
   /// Default Constructor
   PiecewiseQuadratic() = default;
 
+  /// Copy constructor
+  PiecewiseQuadratic(const PiecewiseQuadratic& other) = default;
+
   /// Standard Constructor
   PiecewiseQuadratic(const Mat& C, const Vec& xc) : C_(C), xc_(xc) {}
 
@@ -69,8 +101,13 @@ class PiecewiseQuadratic {
   PiecewiseQuadratic(double a, double b, double c, double d, double e, double f)
       : C_((Mat(1, 6) << a, b, c, d, e, f).finished()), xc_(Vec(0)) {}
 
-  /// Copy constructor
-  PiecewiseQuadratic(const PiecewiseQuadratic& other) = default;
+  /// Constructor from PiecewiseQuadratic1d, by setting b = c = e = 0
+  PiecewiseQuadratic(const PiecewiseQuadratic1d& q1d)
+      : C_((Mat(q1d.C.rows(), 6) << q1d.C.col(0), Vec::Zero(q1d.C.rows()),
+            Vec::Zero(q1d.C.rows()), q1d.C.col(1), Vec::Zero(q1d.C.rows()),
+            q1d.C.col(2))
+               .finished()),
+        xc_(q1d.xc) {}
 
   /// Constructor from a vector of objectives
   PiecewiseQuadratic(const std::vector<RetimingObjective>& objectives);
@@ -97,7 +134,19 @@ class PiecewiseQuadratic {
   /// We might not even need this entire function because it's more efficient
   /// for solveParametric to return the objective function rather than the
   /// conditional, but it's good practice I guess
-  PiecewiseQuadratic substitute(const PiecewiseLinear& conditional) const;
+  PiecewiseQuadratic1d substitute(const PiecewiseLinear& conditional) const;
+
+  /// Applies `func` to each of the segments where we have a distinct region
+  /// between the quadratic (piecewise over x) and conditional (linear piecewise
+  /// over y) regions.
+  /// Iteration is guaranteed to occur in ascending order of y.
+  /// @param func(x_segment_index, y_segment_index) is called for each segment,
+  /// where x_segment `i` is bounded to-the-right by xc[i] and y_segment `j` is
+  /// bounded above by yc[j]
+  static void iterateOverXcYcSegments(
+      const Vec& xc, const PiecewiseLinear& conditional,
+      const std::function<void(int x_segment_index, int y_segment_index,
+                               double y_upper_bound)>& func);
 
   // TODO(gerry): implementation
   PiecewiseQuadratic rekey(const KeyVector& src_keys,
@@ -110,12 +159,11 @@ class PiecewiseQuadratic {
   // Testable
   void print(const std::string& s = "Piecewise Quadratic",
              const KeyFormatter& formatter = DefaultKeyFormatter) const {
-    std::cout << s << " unimplemented\n";
+    std::cout << s << "C:\n" << C_ << "\nxc:\n" << xc_ << std::endl;
   }
   bool equals(const This& other, double tol = 1e-9) const {
-    std::cout << "Warning: Piecewise Quadratic not yet implemented"
-              << std::endl;
-    return true;
+    return traits<Mat>::Equals(C_, other.C_, tol) &&
+           traits<Vec>::Equals(xc_, other.xc_, tol);
   }
 
   // Getters
@@ -144,5 +192,7 @@ class PiecewiseQuadratic {
 
 template <>
 struct traits<PiecewiseQuadratic> : public Testable<PiecewiseQuadratic> {};
+template <>
+struct traits<PiecewiseQuadratic1d> : public Testable<PiecewiseQuadratic1d> {};
 
 }  // namespace gtsam

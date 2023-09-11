@@ -85,7 +85,7 @@ std::pair<PiecewiseQuadratic, Bounds1d> PiecewiseQuadratic::solveParametric(
 
 /******************************************************************************/
 template <typename EigenRow1>
-Eigen::Matrix<double, 1, 6> substitute(const EigenRow1& q, const double m_,
+Eigen::Matrix<double, 1, 3> substitute(const EigenRow1& q, const double m_,
                                        const double b_) {
   // x = m_*y + b_
   // x = K*y + k  (re-notate with K, k)
@@ -93,11 +93,8 @@ Eigen::Matrix<double, 1, 6> substitute(const EigenRow1& q, const double m_,
   // = (a.K^2 + b + c.K).y^2 + (2.a.K.k + c.k + d.K + e).y + (a.k^2 + d.k + f)
   const double &a = q(0), &b = q(1), &c = q(2), &d = q(3), &e = q(4), &f = q(5);
   const double &K = m_, &k = b_;
-  return Eigen::Matrix<double, 1, 6>((a * K * K + b + c * K),  // y^2
-                                     0,                        // z^2
-                                     0,                        // yz
+  return Eigen::Matrix<double, 1, 3>((a * K * K + b + c * K),  // y^2
                                      (2 * a * K * k + c * k + d * K + e),  // y
-                                     0,                                    // z
                                      (a * k * k + d * k + f));             // 1
 }
 
@@ -147,18 +144,12 @@ int computeNumSegments(const Vec& xc, const PiecewiseLinear& conditional) {
 }
 
 /******************************************************************************/
-/// Applies `func` to each of the segments where we have a distinct region
-/// between the quadratic (piecewise over x) and conditional (linear piecewise
-/// over y) regions.
-/// This is computed by iterating over the y-regions and finding all the
-/// x-crossings that occur to iterate over the x-regions.
-/// @param func(x_segment_index, y_segment_index) is called for each segment,
-/// where x_segment `i` is bounded to-the-right by xc[i] and y_segment `j` is
-/// bounded above by yc[j]
-void iterateOverXcYcSegments(
+void PiecewiseQuadratic::iterateOverXcYcSegments(
     const Vec& xc, const PiecewiseLinear& conditional,
     const std::function<void(int x_segment_index, int y_segment_index,
                              double y_upper_bound)>& func) {
+  // This is computed by iterating over the y-regions and finding all the
+  // x-crossings that occur to iterate over the x-regions.
   const auto& m = conditional.m;
   const auto& b = conditional.b;
   const auto& yc = conditional.xc;
@@ -224,7 +215,7 @@ void iterateOverXcYcSegments(
 
 /******************************************************************************/
 
-PiecewiseQuadratic PiecewiseQuadratic::substitute(
+PiecewiseQuadratic1d PiecewiseQuadratic::substitute(
     const PiecewiseLinear& conditional) const {
   // `this` is a piecewise quadratic q(x, y), which is piecewise in x
   const auto& Q = C_;
@@ -236,7 +227,7 @@ PiecewiseQuadratic PiecewiseQuadratic::substitute(
   // To substitute, we work our way up the segments of the conditional.
   // Each time we cross a segment boundary in q, we need to split off and add
   // another segment.
-  std::vector<Eigen::Matrix<double, 1, 6>> Qs;  // the new segments of q
+  std::vector<Eigen::Matrix<double, 1, 3>> Qs;  // the new segments of q
   std::vector<double> ycs;  // the new segment boundaries of q
 
   auto func = [&ycs, &Qs, &Q, &m, &b](int x_segment_index, int y_segment_index,
@@ -248,11 +239,11 @@ PiecewiseQuadratic PiecewiseQuadratic::substitute(
   iterateOverXcYcSegments(xc, conditional, func);
 
   // Extract into Eigen types
-  PiecewiseQuadratic result;
-  result.C_.resize(Qs.size(), 6);
-  result.xc_.resize(ycs.size() - 1);  // final yc should be inf
-  std::copy(Qs.begin(), Qs.end(), result.C_.rowwise().begin());
-  std::copy(ycs.begin(), ycs.end() - 1, result.xc_.begin());
+  PiecewiseQuadratic1d result;
+  result.C.resize(Qs.size(), 6);
+  result.xc.resize(ycs.size() - 1);  // final yc should be inf
+  std::copy(Qs.begin(), Qs.end(), result.C.rowwise().begin());
+  std::copy(ycs.begin(), ycs.end() - 1, result.xc.begin());
   return result;
 }
 

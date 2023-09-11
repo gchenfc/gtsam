@@ -25,7 +25,7 @@ struct PiecewiseLinear {
   /// @brief Evaluate the piecewise linear at a point x
   double evaluate(double x) {
     auto i =
-        std::distance(xc.begin(), std::lower_bound(xc.begin(), xc.end(), x));
+        std::distance(xc.begin(), std::upper_bound(xc.begin(), xc.end(), x));
     return m(i) * x + b(i);
   }
 

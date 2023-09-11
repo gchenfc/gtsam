@@ -119,7 +119,7 @@ TEST(PiecewiseQuadratic, substitute) {
   Vector3 yc2{-1.5, 0, 0.5};
   PiecewiseLinear x_of_y{m, b2, yc2};
 
-  auto q_of_y = q.substitute(x_of_y);
+  PiecewiseQuadratic q_of_y = q.substitute(x_of_y);
 
   // First check that q is only a function of 1 variable
   EXPECT((q_of_y.b().array() == 0).all());

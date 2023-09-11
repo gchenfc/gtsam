@@ -26,7 +26,7 @@ using namespace std;
 using namespace gtsam;
 
 /* ************************************************************************* */
-TEST(PiecewiseQuadratic, evaluate1) {
+TEST(PiecewiseLinear, evaluate1) {
   // y = m.x + b
   Matrix m_b_xc(4, 3);
   m_b_xc << 1.0, 2.0, 3.0,  //
