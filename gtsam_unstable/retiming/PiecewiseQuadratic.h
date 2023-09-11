@@ -24,8 +24,6 @@
 
 namespace gtsam {
 
-constexpr int kNumVars = 2;
-
 // Forward declare
 struct RetimingObjective;
 
@@ -33,34 +31,46 @@ struct RetimingObjective;
  * @brief A piecewise quadratic used to define objectives.
  *
  * The following representation is used for a quadratic:
- *    x' := x - x0
- *    y' := y - y0
- *    f(x) = a * x'^2 + b * x' * y' + c * y'^2
+ *    f(x) = a.x^2 + b.y^2 + c.x.y + d.x + e.y + f
  *    NOT THIS: f(x) = [x'; y']^T * Q * [x'; y']
  *              where Q is a 2x2 matrix.
  * This is convenient because:
- *  - we can represent the "piecewise" part with vectors a, b, c to vectorize
- *    calculations
- *  - global solution is trivial: x=x0 and y=y0
- *  - parametric solution is easy: x'* = -(b / 2a)y'
+ *  - we can represent the "piecewise" part with *vectors* a, b, c, d, e, f to
+ *    vectorize calculations
+ *  - parametric solution is easy: x'* = -(c.y + d) / (2a)
  *
- * A piecewise quadratic will be represented with vectors x0, y0, a, b, c, and a
- * vector of dividing points x.  Note that for our application it will always be
- * piecewise in x only.
+ * A piecewise quadratic will be represented with vectors a, b, c, d, e, f, and
+ * a vector of dividing points x.  Note that for our application it will always
+ * be piecewise in x only.
  */
 class PiecewiseQuadratic {
  public:
   using shared_ptr = std::shared_ptr<PiecewiseQuadratic>;
   using This = PiecewiseQuadratic;
 
-  using Mat = Eigen::Matrix<double, kNumVars, kNumVars>;
-  using Vec = Eigen::Matrix<double, kNumVars, 1>;
+  using Mat = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
+  using Vec = Eigen::Vector<double, Eigen::Dynamic>;
 
   using Inequalities = LinearConstraint::Linears;
-  using Bounds1d = Inequalities;
+  using Bounds1d = Eigen::Matrix<double, 2, 2>;
 
   /// Default Constructor
   PiecewiseQuadratic() = default;
+
+  /// Standard Constructor
+  PiecewiseQuadratic(const Vec& a, const Vec& b, const Vec& c, const Vec& d,
+                     const Vec& e, const Vec& f, const Vec& xc)
+      : a_(a), b_(b), c_(c), d_(d), e_(e), f_(f), xc_(xc) {}
+
+  /// Constructor for a single (non-piecewise) quadratic
+  PiecewiseQuadratic(double a, double b, double c, double d, double e, double f)
+      : a_(Eigen::Vector<double, 1>(a)),
+        b_(Eigen::Vector<double, 1>(b)),
+        c_(Eigen::Vector<double, 1>(c)),
+        d_(Eigen::Vector<double, 1>(d)),
+        e_(Eigen::Vector<double, 1>(e)),
+        f_(Eigen::Vector<double, 1>(f)),
+        xc_(Vec(0)) {}
 
   /// Constructor from a vector of objectives
   PiecewiseQuadratic(const std::vector<RetimingObjective>& objectives);
@@ -68,13 +78,16 @@ class PiecewiseQuadratic {
   /// Constructor that sums a bunch of piecewise quadratics
   PiecewiseQuadratic(const std::vector<PiecewiseQuadratic>& objectives);
 
+  /// Evaluate the objective for a given x and y
+  double evaluate(double x, double y) const;
+
   /// Solve a parametric, piecewise QP with linear inequalities to obtain a
   /// piecewise linear solution x^*(y) and inequality bounds on the argument y.
   std::pair<PiecewiseLinear, Bounds1d> solveParametric(
       const Inequalities& inequalities) const;
 
   /// Substitute a solution x^*(y) into the quadratic to obtain a new
-  /// piecewise quadratic on y (one variable).
+  /// piecewise quadratic on y (one variable, so b, c, e = 0).
   PiecewiseQuadratic substitute(const PiecewiseLinear& conditional) const;
 
   // TODO(gerry): implementation
@@ -96,9 +109,18 @@ class PiecewiseQuadratic {
     return true;
   }
 
+  // Getters
+  const Vec& a() const { return a_; }
+  const Vec& b() const { return b_; }
+  const Vec& c() const { return c_; }
+  const Vec& d() const { return d_; }
+  const Vec& e() const { return e_; }
+  const Vec& f() const { return f_; }
+  const Vec& xc() const { return xc_; }
+
  private:
   // Member variables
-  Vec x0_, y0_, a_, b_, c_, xc_;
+  Vec a_, b_, c_, d_, e_, f_, xc_;
 };
 
 template <>
