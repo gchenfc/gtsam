@@ -48,7 +48,7 @@ class PiecewiseQuadratic {
   using shared_ptr = std::shared_ptr<PiecewiseQuadratic>;
   using This = PiecewiseQuadratic;
 
-  using Mat = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
+  using Mat = Eigen::Matrix<double, Eigen::Dynamic, 6>;
   using Vec = Eigen::Vector<double, Eigen::Dynamic>;
 
   using Inequalities = LinearConstraint::Linears;
@@ -60,17 +60,14 @@ class PiecewiseQuadratic {
   /// Standard Constructor
   PiecewiseQuadratic(const Vec& a, const Vec& b, const Vec& c, const Vec& d,
                      const Vec& e, const Vec& f, const Vec& xc)
-      : a_(a), b_(b), c_(c), d_(d), e_(e), f_(f), xc_(xc) {}
+      : C_((Mat(a.size(), 6) << a, b, c, d, e, f).finished()), xc_(xc) {}
 
   /// Constructor for a single (non-piecewise) quadratic
   PiecewiseQuadratic(double a, double b, double c, double d, double e, double f)
-      : a_(Eigen::Vector<double, 1>(a)),
-        b_(Eigen::Vector<double, 1>(b)),
-        c_(Eigen::Vector<double, 1>(c)),
-        d_(Eigen::Vector<double, 1>(d)),
-        e_(Eigen::Vector<double, 1>(e)),
-        f_(Eigen::Vector<double, 1>(f)),
-        xc_(Vec(0)) {}
+      : C_((Mat(1, 6) << a, b, c, d, e, f).finished()), xc_(Vec(0)) {}
+
+  /// Copy constructor
+  PiecewiseQuadratic(const PiecewiseQuadratic& other) = default;
 
   /// Constructor from a vector of objectives
   PiecewiseQuadratic(const std::vector<RetimingObjective>& objectives);
@@ -78,12 +75,18 @@ class PiecewiseQuadratic {
   /// Constructor that sums a bunch of piecewise quadratics
   PiecewiseQuadratic(const std::vector<PiecewiseQuadratic>& objectives);
 
+  /// Find which piecewise segment x is in
+  auto findIndex(double x) const {
+    return std::distance(xc_.begin(),
+                         std::lower_bound(xc_.begin(), xc_.end(), x));
+  }
+
   /// Evaluate the objective for a given x and y
   double evaluate(double x, double y) const;
 
   /// Solve a parametric, piecewise QP with linear inequalities to obtain a
   /// piecewise linear solution x^*(y) and inequality bounds on the argument y.
-  std::pair<PiecewiseLinear, Bounds1d> solveParametric(
+  std::pair<PiecewiseQuadratic, Bounds1d> solveParametric(
       const Inequalities& inequalities) const;
 
   /// Substitute a solution x^*(y) into the quadratic to obtain a new
@@ -110,17 +113,27 @@ class PiecewiseQuadratic {
   }
 
   // Getters
-  const Vec& a() const { return a_; }
-  const Vec& b() const { return b_; }
-  const Vec& c() const { return c_; }
-  const Vec& d() const { return d_; }
-  const Vec& e() const { return e_; }
-  const Vec& f() const { return f_; }
+  const auto a() const { return C_.col(0); }
+  const auto b() const { return C_.col(1); }
+  const auto c() const { return C_.col(2); }
+  const auto d() const { return C_.col(3); }
+  const auto e() const { return C_.col(4); }
+  const auto f() const { return C_.col(5); }
   const Vec& xc() const { return xc_; }
+  const Mat& C() const { return C_; }
+  auto a() { return C_.col(0); }
+  auto b() { return C_.col(1); }
+  auto c() { return C_.col(2); }
+  auto d() { return C_.col(3); }
+  auto e() { return C_.col(4); }
+  auto f() { return C_.col(5); }
+  Vec& xc() { return xc_; }
+  Mat& C() { return C_; }
 
  private:
   // Member variables
-  Vec a_, b_, c_, d_, e_, f_, xc_;
+  Mat C_;
+  Vec xc_;
 };
 
 template <>

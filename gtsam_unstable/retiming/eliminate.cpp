@@ -113,13 +113,13 @@ EliminateLp2d(const RetimingFactor& factor, const KeyVector& ordering) {
 GTSAM_EXPORT std::pair<std::shared_ptr<RetimingConditional>,
                        std::shared_ptr<RetimingFactor>>
 EliminateQp2d(const RetimingFactor& factor, KeyVector& keys) {
-  static constexpr int col_index = 0;
+  // static constexpr int col_index = 0;
 
   PiecewiseQuadratic objective{factor.objectives()};
-  const auto [/*PiecewiseLinear*/ conditional,
+  const auto [/*PiecewiseQuadratic*/ new_objective,
               /*Inequalities*/ new_constraint] =
       objective.solveParametric(factor.inequalities());
-  const auto new_objective = objective.substitute(conditional);
+  // const auto new_objective = objective.substitute(conditional);
 
   // Even though we computed conditional, gtsam conditionals must derive from
   // factor (makes sense) but this will be prickly so let's just use the

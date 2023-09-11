@@ -34,7 +34,7 @@ using Bounds1d = Eigen::Matrix<double, 2, 2>;
 /* ************************************************************************* */
 TEST(PiecewiseQuadratic, evaluate1) {
   // 1x^2 + 2y^2 + 3xy + 4x + 5y + 6
-  PiecewiseQuadratic q(1.0, 2.0, 3.0, 4.0, 5.0);
+  PiecewiseQuadratic q(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
 
   EXPECT_DOUBLES_EQUAL(6.0, q.evaluate(0.0, 0.0), 1e-9);
   EXPECT_DOUBLES_EQUAL(11.0, q.evaluate(1.0, 0.0), 1e-9);
@@ -45,13 +45,13 @@ TEST(PiecewiseQuadratic, evaluate1) {
 }
 
 TEST(PiecewiseQuadratic, evaluate2) {
-  Vec a{1, 2, 3};
-  Vec b{4, 5, 6};
-  Vec c{7, 8, 9};
-  Vec d{0.6, 0.5, 0.4};
-  Vec e{0.3, 0.2, 0.1};
-  Vec f{0.9, 0.8, 0.7};
-  Vec xc{10, 11};
+  Vector3 a{1, 2, 3};
+  Vector3 b{4, 5, 6};
+  Vector3 c{7, 8, 9};
+  Vector3 d{0.6, 0.5, 0.4};
+  Vector3 e{0.3, 0.2, 0.1};
+  Vector3 f{0.9, 0.8, 0.7};
+  Vector2 xc{10, 11};
   PiecewiseQuadratic q(a, b, c, d, e, f, xc);
 
   EXPECT_DOUBLES_EQUAL(349.65, q.evaluate(9.9, 3), 1e-9);
@@ -64,23 +64,23 @@ TEST(PiecewiseQuadratic, evaluate2) {
 TEST(PiecewiseQuadratic, sum) {
   PiecewiseQuadratic q1, q2;
   {
-    Vec a{1, 2, 3};
-    Vec b{4, 5, 6};
-    Vec c{7, 8, 9};
-    Vec d{1.1, 1.2, 1.3};
-    Vec e{0.6, 0.5, 0.4};
-    Vec f{0.3, 0.2, 0.1};
-    Vec xc{10, 11};
+    Vector3 a{1, 2, 3};
+    Vector3 b{4, 5, 6};
+    Vector3 c{7, 8, 9};
+    Vector3 d{1.1, 1.2, 1.3};
+    Vector3 e{0.6, 0.5, 0.4};
+    Vector3 f{0.3, 0.2, 0.1};
+    Vector2 xc{10, 11};
     q1 = PiecewiseQuadratic(a, b, c, d, e, f, xc);
   }
   {
-    Vec a{9, 8, 0.1};
-    Vec b{1.3, 1.4, 1.9};
-    Vec c{0.2, 0.3, 0.4};
-    Vec d{0.5, 0.6, 0.7};
-    Vec e{0.8, 0.9, 1.0};
-    Vec f{1.1, 1.2, 1.3};
-    Vec xc{4, 10.5};
+    Vector3 a{9, 8, 0.1};
+    Vector3 b{1.3, 1.4, 1.9};
+    Vector3 c{0.2, 0.3, 0.4};
+    Vector3 d{0.5, 0.6, 0.7};
+    Vector3 e{0.8, 0.9, 1.0};
+    Vector3 f{1.1, 1.2, 1.3};
+    Vector2 xc{4, 10.5};
     q2 = PiecewiseQuadratic(a, b, c, d, e, f, xc);
   }
 
@@ -93,7 +93,7 @@ TEST(PiecewiseQuadratic, sum) {
   };
 
   for (double x = 3.1; x < 12.5; x += 0.5) {
-    for (double y = 0, y < 12, y += 0.75) {
+    for (double y = 0; y < 12; y += 0.75) {
       test_with_xy(x, y);
     }
   }
@@ -101,19 +101,19 @@ TEST(PiecewiseQuadratic, sum) {
 
 /* ************************************************************************* */
 TEST(PiecewiseQuadratic, substitute) {
-  Vec a{1, 2, 3};
-  Vec b{4, 5, 6};
-  Vec c{7, 8, 9};
-  Vec d{1.1, 1.2, 1.3};
-  Vec e{0.6, 0.5, 0.4};
-  Vec f{0.3, 0.2, 0.1};
-  Vec xc{10, 11};
+  Vector3 a{1, 2, 3};
+  Vector3 b{4, 5, 6};
+  Vector3 c{7, 8, 9};
+  Vector3 d{1.1, 1.2, 1.3};
+  Vector3 e{0.6, 0.5, 0.4};
+  Vector3 f{0.3, 0.2, 0.1};
+  Vector2 xc{10, 11};
   PiecewiseQuadratic q(a, b, c, d, e, f, xc);
 
-  Vec m{-1.0, -2.0, -3.0};
-  Vec b2{0.1, 0.2, 0.3};
-  Vec xc2{0.4, 0.5};
-  PiecewiseLinear x_of_y { m, b2, xc2 }
+  Vector3 m{-1.0, -2.0, -3.0};
+  Vector3 b2{0.1, 0.2, 0.3};
+  Vector2 xc2{0.4, 0.5};
+  PiecewiseLinear x_of_y{m, b2, xc2};
 
   auto q_of_y = q.substitute(x_of_y);
 
@@ -163,16 +163,16 @@ TEST(PiecewiseQuadratic, solve_parametric) {
   // z1: [0.5, 3, 0, 0.5, -0.6, 0.155]
   // z2: [0.8, 1, -1.2, 0, 0, 0]
 
-  Vec a{0.5, 0.8};
-  Vec b{3.0, 1.0};
-  Vec c{0.0, -1.2};
-  Vec d{0.5, 0.0};
-  Vec e{-0.6, 0.0};
-  Vec f{0.155, 0.0};
-  Vec xc{0.0};
-  PiecewiseQuadratic q(a, b, c, d, e, f);
+  Vector2 a{0.5, 0.8};
+  Vector2 b{3.0, 1.0};
+  Vector2 c{0.0, -1.2};
+  Vector2 d{0.5, 0.0};
+  Vector2 e{-0.6, 0.0};
+  Vector2 f{0.155, 0.0};
+  Vector1 xc{0.0};
+  PiecewiseQuadratic q(a, b, c, d, e, f, xc);
 
-  Inequalities inequalities(8);
+  Inequalities inequalities(8, 3);
   inequalities << 1.0, 0.0, 1.0,  // x <= 1
       -1.0, 0.0, 1.0,             // x >= -1
       0.0, 1.0, 1.0,              // y <= 1
@@ -185,7 +185,8 @@ TEST(PiecewiseQuadratic, solve_parametric) {
   auto [actual_objective, actual_bounds] = q.solveParametric(inequalities);
 
   // Compare to expected bounds on y
-  Bounds1d expected_bounds(1, 1, -1, 1);  // -1 <= y <= 1
+  Bounds1d expected_bounds =
+      (Bounds1d() << 1, 1, -1, 1).finished();  // -1 <= y <= 1
   EXPECT(assert_equal(expected_bounds, actual_bounds, 1e-9));
 
   // Construct the expected x^*(y) piecewise linear solution.
@@ -196,9 +197,9 @@ TEST(PiecewiseQuadratic, solve_parametric) {
       0, -0.5, xc3,            // x = -0.5, for xc2 < y <= xc3
       0.75, 0, 6.0 / 7.0,      // x = 0.75 * y, for xc3 < y <= 6/7
       -1, 1.5, 999999999;      // x = 1.5 - y, for y > 6/7
-  PiecewiseLinear expected_conditional(expected_m_b_yc.col(0),
-                                       expected_m_b_yc.col(1),
-                                       expected_m_b_yc.col(2).head<4>());
+  PiecewiseLinear expected_conditional{.m = expected_m_b_yc.col(0),
+                                       .b = expected_m_b_yc.col(1),
+                                       .xc = expected_m_b_yc.col(2).head<4>()};
   // Substitute x^*(y) into the objective function to obtain the propagated
   // objective function
   PiecewiseQuadratic expected_objective = q.substitute(expected_conditional);
