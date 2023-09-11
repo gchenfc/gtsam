@@ -58,6 +58,9 @@ class PiecewiseQuadratic {
   PiecewiseQuadratic() = default;
 
   /// Standard Constructor
+  PiecewiseQuadratic(const Mat& C, const Vec& xc) : C_(C), xc_(xc) {}
+
+  /// Vector Constructor
   PiecewiseQuadratic(const Vec& a, const Vec& b, const Vec& c, const Vec& d,
                      const Vec& e, const Vec& f, const Vec& xc)
       : C_((Mat(a.size(), 6) << a, b, c, d, e, f).finished()), xc_(xc) {}
@@ -89,8 +92,11 @@ class PiecewiseQuadratic {
   std::pair<PiecewiseQuadratic, Bounds1d> solveParametric(
       const Inequalities& inequalities) const;
 
-  /// Substitute a solution x^*(y) into the quadratic to obtain a new
-  /// piecewise quadratic on y (one variable, so b, c, e = 0).
+  /// Substitute a piecewise linear solution x^*(y) into the quadratic to obtain
+  /// a new piecewise quadratic on y (one variable, so b, c, e = 0).
+  /// We might not even need this entire function because it's more efficient
+  /// for solveParametric to return the objective function rather than the
+  /// conditional, but it's good practice I guess
   PiecewiseQuadratic substitute(const PiecewiseLinear& conditional) const;
 
   // TODO(gerry): implementation

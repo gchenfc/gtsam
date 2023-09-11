@@ -107,13 +107,17 @@ TEST(PiecewiseQuadratic, substitute) {
   Vector3 d{1.1, 1.2, 1.3};
   Vector3 e{0.6, 0.5, 0.4};
   Vector3 f{0.3, 0.2, 0.1};
-  Vector2 xc{10, 11};
+  Vector2 xc{-1, 1};
   PiecewiseQuadratic q(a, b, c, d, e, f, xc);
 
-  Vector3 m{-1.0, -2.0, -3.0};
-  Vector3 b2{0.1, 0.2, 0.3};
-  Vector2 xc2{0.4, 0.5};
-  PiecewiseLinear x_of_y{m, b2, xc2};
+  // y = x - 3,  y < -1.5
+  // y = -x,     -1.5 < y < 0
+  // y = x,      0 < y < 0.5
+  // y = -x + 2, 0.5 < y  (discontinuity at 0.5)
+  Vector4 m{1, -1, 1, -1};
+  Vector4 b2{3, 0, 0, 2};
+  Vector3 yc2{-1.5, 0, 0.5};
+  PiecewiseLinear x_of_y{m, b2, yc2};
 
   auto q_of_y = q.substitute(x_of_y);
 
@@ -126,6 +130,8 @@ TEST(PiecewiseQuadratic, substitute) {
   auto test_with_y = [&](double y) {
     auto x = x_of_y.evaluate(y);
     auto expected = q.evaluate(x, y);
+    // std::cout << "Trying " << y << "\tx = " << x
+    //           << "\texpected = " << expected << std::endl;
     auto actual = q_of_y.evaluate(y, 0);
     EXPECT_DOUBLES_EQUAL(expected, actual, 1e-9);
     actual = q_of_y.evaluate(y, 10);
@@ -134,27 +140,12 @@ TEST(PiecewiseQuadratic, substitute) {
     EXPECT_DOUBLES_EQUAL(expected, actual, 1e-9);
   };
 
-  test_with_y(0.0);
-  test_with_y(0.1);
-  test_with_y(0.2);
-
-  test_with_y(0.39);
-  test_with_y(0.40);
-  test_with_y(0.41);
-
-  test_with_y(0.49);
-  test_with_y(0.50);
-  test_with_y(0.51);
-
-  test_with_y(9.99);
-  test_with_y(10.00);
-  test_with_y(10.01);
-
-  test_with_y(10.99);
-  test_with_y(11.00);
-  test_with_y(11.01);
-
-  test_with_y(100);
+  std::vector<double> crossing_points{-4, -2, -1.5, -1, 0, 0.5, 1, 3};
+  for (auto y : crossing_points) {
+    test_with_y(y - 0.01);
+    // test_with_y(y);  // Don't run this because <= vs < isn't well defined
+    test_with_y(y + 0.01);
+  }
 }
 
 /* ************************************************************************* */
