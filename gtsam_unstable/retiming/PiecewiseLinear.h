@@ -22,7 +22,11 @@ struct PiecewiseLinear {
 
   Vec m, b, xc;
 
-  double evaluate(double x) { return 0; }
+  double evaluate(double x) {
+    auto i =
+        std::distance(xc.begin(), std::lower_bound(xc.begin(), xc.end(), x));
+    return m(i) * x + b(i);
+  }
 };
 
 }  // namespace gtsam
