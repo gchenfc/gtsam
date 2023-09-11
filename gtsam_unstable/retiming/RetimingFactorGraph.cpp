@@ -34,8 +34,10 @@ Linears RetimingFactorGraph::equalities(const KeyVector& kv) const {
   Linears equalities(numRows, kv.size() + 1);
   size_t row = 0;
   for (const auto& factor : *this) {
-    equalities.middleRows(row, factor->equalities().rows()) =
-        LinearConstraint::rekey(factor->equalities(), factor->keys(), kv);
+    LinearConstraint::rekey(
+        factor->equalities(),
+        equalities.middleRows(row, factor->equalities().rows()),  //
+        factor->keys(), kv);
     row += factor->equalities().rows();
   }
   return equalities;
@@ -49,8 +51,10 @@ Linears RetimingFactorGraph::inequalities(const KeyVector& kv) const {
   Linears inequalities(numRows, kv.size() + 1);
   size_t row = 0;
   for (const auto& factor : *this) {
-    inequalities.middleRows(row, factor->inequalities().rows()) =
-        LinearConstraint::rekey(factor->inequalities(), factor->keys(), kv);
+    LinearConstraint::rekey(
+        factor->inequalities(),
+        inequalities.middleRows(row, factor->inequalities().rows()),  //
+        factor->keys(), kv);
     row += factor->inequalities().rows();
   }
   return inequalities;
