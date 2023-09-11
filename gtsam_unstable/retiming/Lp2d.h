@@ -1,6 +1,6 @@
 /**
  * @file Lp2d.h
- * @brief Utilities for solving 2-dimensional LPs
+ * @brief Utilities for solving 2-dimensional LPs.
  * @author Gerry Chen
  * @date Sept 2023
  */
@@ -45,7 +45,8 @@ Point intersection(const Inequality& line1, const Inequality& line2,
                    double parallel_tol = 1e-12);
 
 /// @brief Checks whether a point satisfies the inequalities
-bool isFeasible(const Inequalities& inequalities, const Point& point, double tol = 1e-12);
+bool isFeasible(const Inequalities& inequalities, const Point& point,
+                double tol = 1e-12);
 
 }  // namespace lp2d
 }  // namespace gtsam
