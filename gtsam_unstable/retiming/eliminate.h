@@ -31,8 +31,7 @@ bool AllObjectivesGreedy(const RetimingObjectives& objectives);
 /// Helper Elimination Function for special case of exactly 2 variables
 GTSAM_EXPORT std::pair<std::shared_ptr<RetimingConditional>,
                        std::shared_ptr<RetimingFactor>>
-Eliminate2Vars2Inequalities(const RetimingFactor& factor,
-                            const KeyVector& keys);
+EliminateLp2d(const RetimingFactor& factor, const KeyVector& keys);
 
 /// Helper Elimination Function for special case of >2 variables, but only 2
 /// have inequalities.  This is an edge-case when the graph isn't smart enough
@@ -40,6 +39,12 @@ Eliminate2Vars2Inequalities(const RetimingFactor& factor,
 GTSAM_EXPORT std::pair<std::shared_ptr<RetimingConditional>,
                        std::shared_ptr<RetimingFactor>>
 EliminateManyVars2Inequalities(const RetimingFactor& factor, KeyVector& keys);
+
+/// Helper Elimination Function for 2 variables with inequalities and piecewise
+/// quadratic objective
+GTSAM_EXPORT std::pair<std::shared_ptr<RetimingConditional>,
+                       std::shared_ptr<RetimingFactor>>
+EliminateQp2d(const RetimingFactor& factor, KeyVector& keys);
 
 }  // namespace elimination_helpers
 

@@ -4,6 +4,8 @@
 #include "RetimingConditional.h"
 #include "RetimingFactorGraph.h"
 #include "Lp2d.h"
+#include "PiecewiseLinear.h"
+#include "PiecewiseQuadratic.h"
 
 namespace gtsam {
 
@@ -61,7 +63,9 @@ EliminateRetiming(const RetimingFactorGraph& factors, const Ordering& keys) {
 
   // Third, check for 2-variable inequalities
   if (ordering.size() == 2) {
-    return Eliminate2Vars2Inequalities(factor, ordering);
+    return AllObjectivesGreedy(factor.objectives())
+               ? EliminateLp2d(factor, ordering)
+               : EliminateQp2d(factor, ordering);
   }
   // Or check if there are more than 2 variables, but only 2 have inequalities
   // (edge case)
@@ -92,8 +96,7 @@ bool AllObjectivesGreedy(const RetimingObjectives& objectives) {
 
 GTSAM_EXPORT std::pair<std::shared_ptr<RetimingConditional>,
                        std::shared_ptr<RetimingFactor>>
-Eliminate2Vars2Inequalities(const RetimingFactor& factor,
-                            const KeyVector& ordering) {
+EliminateLp2d(const RetimingFactor& factor, const KeyVector& ordering) {
   static constexpr int col_index = 0;
   assertm(AllObjectivesGreedy(factor.objectives()),
           "Elimination with non-greedy objectives not yet implemented");
@@ -103,6 +106,28 @@ Eliminate2Vars2Inequalities(const RetimingFactor& factor,
               KeyVector{ordering.back()}, factor.objectives(),
               LinearConstraint::dropCol(factor.equalities(), col_index),
               lp2d::extremalsY(factor.inequalities()))};
+}
+
+/******************************************************************************/
+
+GTSAM_EXPORT std::pair<std::shared_ptr<RetimingConditional>,
+                       std::shared_ptr<RetimingFactor>>
+EliminateQp2d(const RetimingFactor& factor, KeyVector& keys) {
+  static constexpr int col_index = 0;
+
+  PiecewiseQuadratic objective{factor.objectives()};
+  const auto [/*PiecewiseLinear*/ conditional,
+              /*Inequalities*/ new_constraint] =
+      objective.solveParametric(factor.inequalities());
+  const auto new_objective = objective.substitute(conditional);
+
+  // Even though we computed conditional, gtsam conditionals must derive from
+  // factor (makes sense) but this will be prickly so let's just use the
+  // original factor like with Lp2d
+  return {/*Conditional*/ std::make_shared<RetimingConditional>(factor),
+          /*   Joint   */ std::make_shared<RetimingFactor>(
+              keys, RetimingObjectives{RetimingObjective(new_objective)},
+              factor.equalities(), new_constraint)};
 }
 
 /******************************************************************************/
