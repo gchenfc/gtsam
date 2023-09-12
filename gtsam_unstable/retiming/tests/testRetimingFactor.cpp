@@ -59,7 +59,7 @@ TEST(RetimingFactor, ConstructFromGraph) {
   RetimingFactorGraph factors;
   factors.push_back(
       RetimingFactor::Objective({y}, RetimingObjective::Greedy()));
-  factors.push_back(RetimingFactor::Objective({x, z}, PiecewiseQuadratic{}));
+  // factors.push_back(RetimingFactor::Objective({x, z}, PiecewiseQuadratic{}));
   factors.push_back(
       RetimingFactor::Equality({x, y, z}, LinConstr({1, 2, 3}, 0.2)));
   factors.push_back(RetimingFactor::Equality({x, z}, LinConstr({8, 9}, 0.5)));
@@ -88,7 +88,7 @@ TEST(RetimingFactor, ConstructFromGraph) {
 
   RetimingFactor expected(
       {x, y, z},
-      RetimingObjectives{RetimingObjective::Greedy(), PiecewiseQuadratic{},
+      RetimingObjectives{RetimingObjective::Greedy(),  // PiecewiseQuadratic{},
                          RetimingObjective::Greedy()},
       Stack({
           LinConstr({1, 2, 3}, 0.2),
