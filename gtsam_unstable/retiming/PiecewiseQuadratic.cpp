@@ -48,6 +48,14 @@ void AddInPlace(PiecewiseQuadratic& objective1,
 
 /******************************************************************************/
 
+void PiecewiseQuadratic1d::MinInPlace(PiecewiseQuadratic1d& q1,
+                                      const PiecewiseQuadratic1d& q2) {
+  throw std::runtime_error("TODO");
+  return;
+}
+
+/******************************************************************************/
+
 PiecewiseQuadratic::PiecewiseQuadratic(
     const std::vector<RetimingObjective>& objectives)
     : PiecewiseQuadratic(objectives.size() == 0 ? PiecewiseQuadratic()

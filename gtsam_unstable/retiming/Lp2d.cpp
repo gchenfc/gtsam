@@ -66,6 +66,105 @@ ScalarBounds extremalsY(const Inequalities& inequalities) {
 
 /******************************************************************************/
 
+bool isCcw(const Inequality& line1, const Inequality& line2) {
+  // Check if the inequalities are going ccw or cw.  Return true for ccw
+  return (line1(0) * line2(1) - line1(1) * line2(0)) > 0;
+};
+
+int findCcwIntersection(const Inequalities& inequalities, int start_index,
+                        bool ccw = true) {
+  // Find the first inequality that is ccw with the point
+  for (int i = 0; i < inequalities.rows(); ++i) {
+    if (i == start_index) continue;
+    Point p = intersection(inequalities.row(start_index), inequalities.row(i));
+    if (isFeasible(inequalities, p) &&
+        (isCcw(inequalities.row(start_index), inequalities.row(i)) == ccw)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+void sortInequalitiesCw(const Inequalities& inequalities, int start_index,
+                        int end_index, Inequalities& output) {
+  // Search clockwise starting from start_index, and stop if we ever hit
+  // end_index.  Responsibility is on caller to allocate output
+  int cur_index = start_index;
+  for (int out_index = 0; out_index < output.rows(); ++out_index) {
+    int next_index = findCcwIntersection(inequalities, cur_index, false);
+    if (next_index == end_index) {
+      output.conservativeResize(out_index, Eigen::NoChange);
+      return;
+    } else if (next_index == -1) {
+      // Reached an open boundary, return
+      output.conservativeResize(out_index, Eigen::NoChange);
+      return;
+    } else {
+      output.row(out_index) = inequalities.row(next_index);
+      cur_index = next_index;
+    }
+  }
+  if (findCcwIntersection(inequalities, cur_index, false) != end_index) {
+    throw std::runtime_error("Not enough space allocated");
+  }
+  // No resizing needed
+}
+
+bool sortBoundaries(const Inequalities& inequalities, Inequalities& result) {
+  result.resize(inequalities.rows(), 3);
+  // Handle first pair of edges separately
+  int start_index = 0, most_recent_added;
+  for (; start_index < inequalities.rows(); ++start_index) {
+    most_recent_added = findCcwIntersection(inequalities, start_index);
+    if (most_recent_added != -1) {
+      result.row(0) = inequalities.row(start_index);
+      result.row(1) = inequalities.row(most_recent_added);
+      break;
+    }
+  }
+  if (start_index == inequalities.rows()) return false;  // infeasible
+
+  // Now loop over the rest of the edges
+  for (int index = start_index + 1; index < inequalities.rows(); ++index) {
+    most_recent_added = findCcwIntersection(inequalities, most_recent_added);
+    if (most_recent_added == -1) {
+      // The feasible region is open, so we need to go cw starting from
+      // start_index
+      Inequalities cw(inequalities.rows() - (index + 1), 3);
+      sortInequalitiesCw(inequalities, start_index, most_recent_added, cw);
+      // Insert cw backwards from the end
+      for (int k = cw.rows() - 1; k >= 0; --k) {
+        result.row(index + cw.rows() - k) = cw.row(k);
+      }
+      result.conservativeResize(index + 1 + cw.rows(), Eigen::NoChange);
+      return true;
+    } else if (most_recent_added == start_index) {
+      // We've looped back to the start, so we're done
+      result.conservativeResize(index + 1, Eigen::NoChange);
+      return true;
+    } else {
+      // Insert the new inequality and move on
+      result.row(index + 1) = inequalities.row(most_recent_added);
+    }
+  }
+
+  return false;  // infeasible
+}
+
+/******************************************************************************/
+
+/// @brief Insert new inequalities while maintaining sorted property
+bool insertBoundariesSorted(const Inequalities& inequalities,
+                            const Inequalities& new_inequalities,
+                            Inequalities& result) {
+  // TODO(gerry): implement this more efficiently
+  Inequalities tmp(inequalities.rows() + new_inequalities.rows(), 3);
+  tmp << inequalities, new_inequalities;
+  return sortBoundaries(tmp, result);
+}
+
+/******************************************************************************/
+
 Point intersection(const Inequality& line1, const Inequality& line2,
                    double parallel_tol) {
   // [a, b] . [x] = [e1]
@@ -76,7 +175,11 @@ Point intersection(const Inequality& line1, const Inequality& line2,
                /**/ &c = line2(0), &d = line2(1), &e2 = line2(2);
 
   double det = a * d - b * c;
-  assertm(abs(det) >= parallel_tol, "Lines are parallel");
+  // assertm(abs(det) >= parallel_tol, "Lines are parallel");
+  if (abs(det) < parallel_tol) {
+    return Point(std::numeric_limits<double>::signaling_NaN(),
+                 std::numeric_limits<double>::signaling_NaN());
+  }
 
   return Point(d * e1 - b * e2, -c * e1 + a * e2) / det;
 }

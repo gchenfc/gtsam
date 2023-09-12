@@ -62,12 +62,23 @@ TEST(Lp2d, intersection) {
   expect_solves(Inequality(1, 0, 3), Inequality(2, 0.1, 6));
 
   // Bad cases
-  CHECK_EXCEPTION(intersection(Inequality(1, 0, 0), Inequality(1, 0, 0)),
-                  std::runtime_error);  // colinear
-  CHECK_EXCEPTION(intersection(Inequality(1, 2, 8), Inequality(0.5, 1, 10)),
-                  std::runtime_error);  // parallel
-  CHECK_EXCEPTION(intersection(Inequality(0, 0, 0), Inequality(1, 0, 0)),
-                  std::runtime_error);  // not a line
+  Point err(std::numeric_limits<double>::signaling_NaN(),
+            std::numeric_limits<double>::signaling_NaN());
+  EXPECT(assert_equal(
+      err,                                                      //
+      intersection(Inequality(1, 0, 0), Inequality(1, 0, 0))))  // colinear
+  EXPECT(assert_equal(
+      err,                                                         //
+      intersection(Inequality(1, 2, 8), Inequality(0.5, 1, 10))))  // parallel
+  EXPECT(assert_equal(
+      err,                                                      //
+      intersection(Inequality(0, 0, 0), Inequality(1, 0, 0))))  // not a line
+  // CHECK_EXCEPTION(intersection(Inequality(1, 0, 0), Inequality(1, 0, 0)),
+  //                 std::runtime_error);  // colinear
+  // CHECK_EXCEPTION(intersection(Inequality(1, 2, 8), Inequality(0.5, 1, 10)),
+  //                 std::runtime_error);  // parallel
+  // CHECK_EXCEPTION(intersection(Inequality(0, 0, 0), Inequality(1, 0, 0)),
+  //                 std::runtime_error);  // not a line
 }
 
 /* ************************************************************************* */
@@ -130,6 +141,95 @@ TEST(Lp2d, extremals) {
   auto xbnds_actual = extremalsY(inequalities_x);
   auto xbnds_expected = (ScalarBounds() << 1, 0.5, -1, 0.0).finished();
   EXPECT(assert_equal(xbnds_expected, xbnds_actual));
+}
+
+/* ************************************************************************* */
+TEST(Lp2d, sorted_inequalities) {
+  Inequalities inequalities(7, 3);
+  inequalities << -1, 1, 0.5,  // y <= x + 0.5
+      1. / 3, -1, 0,           // y >= x/3
+      -1, -1, -0.5,            // y >= 0.5 - x
+      1, 1, 1,                 // y <= 1 - x
+      1, 0, 0.5,               // x <= 0.5
+      -1, 0, 100,              // x >= -100
+      0, -1, 100;              // y >= -100
+
+  // Test initial sort
+  Inequalities expected(5, 3);
+  expected << inequalities.row(0), inequalities.row(2), inequalities.row(1),
+      inequalities.row(4), inequalities.row(3);
+  Inequalities actual;
+  EXPECT(sortBoundaries(inequalities, actual));
+  EXPECT(assert_equal(expected, actual));
+
+  // Test inserting new inequalities
+  Inequalities new_inequalities(2, 3);
+  new_inequalities << 1.1, -1, 0,  // y >= 1.1*x
+      1, 0, 10;                    // x <= 10
+  expected.resize(4, 3);
+  expected << inequalities.row(0), inequalities.row(2), new_inequalities.row(0),
+      inequalities.row(3);
+  Inequalities actual2;
+  EXPECT(insertBoundariesSorted(actual, new_inequalities, actual2));
+  EXPECT(assert_equal(expected, actual2));
+
+  // Test inserting infeasible
+  new_inequalities << 1, -1, 0,  // y >= x
+      1, 0, -10;                 // x <= -10
+  EXPECT(!insertBoundariesSorted(actual, new_inequalities, actual2));
+}
+
+/* ************************************************************************* */
+TEST(Lp2d, sorted_inequalities_open_boundary) {
+  Inequalities inequalities(3, 3);
+  inequalities << -1, 0, 0,  // x >= 0
+      -1, 1, 1,              // y <= 1 + x
+      0, -1, 0;              // y >= 0
+
+  // Test initial sort
+  Inequalities expected(3, 3);
+  expected << inequalities.row(0), inequalities.row(2), inequalities.row(1);
+  Inequalities actual;
+  EXPECT(sortBoundaries(inequalities, actual));
+  EXPECT(assert_equal(expected, actual));
+
+  // Test inserting new inequalities
+  Inequalities new_inequalities(1, 3);
+  new_inequalities << 0, 1, 2;  // y <= 2
+
+  expected.resize(4, 3);
+  expected << inequalities.row(0), inequalities.row(2), new_inequalities.row(0),
+      inequalities.row(1);
+  Inequalities actual2;
+  EXPECT(insertBoundariesSorted(actual, new_inequalities, actual2));
+  EXPECT(assert_equal(expected, actual2));
+}
+
+/* ************************************************************************* */
+TEST(Lp2d, sorted_inequalities_open_boundary2) {
+  Inequalities inequalities(4, 3);
+  inequalities << -1, 0, 0,  // x >= 0
+      -1, 1, 1,              // y <= 1 + x
+      0, -1, 0,              // y >= 0
+      -1, -1, 5;             // y >= -5 - x
+
+  // Test initial sort
+  Inequalities expected(3, 3);
+  expected << inequalities.row(0), inequalities.row(2), inequalities.row(1);
+  Inequalities actual;
+  EXPECT(sortBoundaries(inequalities, actual));
+  EXPECT(assert_equal(expected, actual));
+
+  // Test inserting new inequalities
+  Inequalities new_inequalities(1, 3);
+  new_inequalities << 0, 1, 2;  // y <= 2
+
+  expected.resize(4, 3);
+  expected << inequalities.row(0), inequalities.row(2), new_inequalities.row(0),
+      inequalities.row(1);
+  Inequalities actual2;
+  EXPECT(insertBoundariesSorted(actual, new_inequalities, actual2));
+  EXPECT(assert_equal(expected, actual2));
 }
 
 /* ************************************************************************* */

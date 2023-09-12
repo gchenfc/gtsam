@@ -18,6 +18,7 @@ namespace lp2d {
 // inequalities are represented by an Nx3 matrix.
 using Inequality = Eigen::Matrix<double, 1, 3>;
 using Inequalities = Eigen::Matrix<double, Eigen::Dynamic, 3>;
+
 // Scalar inequalities take the form [a, b] where ax <= b, so 2 (forming a
 // bound) would be a 2x2 matrix
 using ScalarBounds = Eigen::Matrix<double, 2, 2>;
@@ -39,6 +40,16 @@ inline double argmaxY(const Inequalities& inequalities) {
 inline double argminY(const Inequalities& inequalities) {
   return -extremalsY(inequalities)(1, 1);
 }
+
+/// @brief Starting from one feasible vertex, sort the inequalities (polygon
+/// edges) in counterclockwise order and remove the un-used inequalities
+/// @returns False if the problem is infeasible
+bool sortBoundaries(const Inequalities& input, Inequalities& result);
+
+/// @brief Insert new inequalities while maintaining sorted property
+bool insertBoundariesSorted(const Inequalities& inequalities,
+                            const Inequalities& new_inequalities,
+                            Inequalities& result);
 
 /// @brief Compute the intersection of 2 lines
 Point intersection(const Inequality& line1, const Inequality& line2,

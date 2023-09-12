@@ -38,6 +38,10 @@ struct PiecewiseQuadratic1d {
   Eigen::Matrix<double, Eigen::Dynamic, 3> C;
   Eigen::VectorXd xc;
 
+  /// @brief Takes the min of a pair of piecewise quadratics
+  static void MinInPlace(PiecewiseQuadratic1d& q1,
+                         const PiecewiseQuadratic1d& q2);
+
   /// @brief Evaluate the piecewise quadratic at a point x
   double evaluate(double x) {
     auto i =
