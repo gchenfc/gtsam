@@ -75,7 +75,9 @@ struct PiecewiseQuadratic1d {
   // Testable
   void print(const std::string& s = "Piecewise Quadratic 1d",
              const KeyFormatter& formatter = DefaultKeyFormatter) const {
-    std::cout << s << "C:\n" << C << "\nxc: " << xc.transpose() << std::endl;
+    std::cout << s << "C:\n"
+              << WithIndent(C, "\t\t")  //
+              << "\txc: " << xc.transpose() << std::endl;
   }
   bool equals(const PiecewiseQuadratic1d& other, double tol = 1e-9) const {
     return traits<decltype(C)>::Equals(C, other.C, tol) &&
@@ -211,7 +213,9 @@ class PiecewiseQuadratic {
   // Testable
   void print(const std::string& s = "Piecewise Quadratic",
              const KeyFormatter& formatter = DefaultKeyFormatter) const {
-    std::cout << s << "C:\n" << C_ << "\nxc:\n" << xc_ << std::endl;
+    std::cout << s << "C:\n"
+              << WithIndent(C_, "\t\t")  //
+              << "\txc: " << xc_.transpose() << std::endl;
   }
   bool equals(const This& other, double tol = 1e-9) const {
     return traits<Mat>::Equals(C_, other.C_, tol) &&

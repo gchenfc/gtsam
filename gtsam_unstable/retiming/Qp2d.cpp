@@ -53,10 +53,7 @@ PiecewiseQuadratic1d min(const PiecewiseQuadratic& objective,
                             ? -std::numeric_limits<double>::infinity()
                             : objective.xc().tail<1>().value();
   if (!insert_x_lims(last_x_bound, std::numeric_limits<double>::infinity())) {
-    double inf = std::numeric_limits<double>::infinity();
-    // Infinite cost, feasible nowhere
-    sol = PiecewiseQuadratic1d{.C = Eigen::Matrix<double, 1, 3>{0, 0, inf},
-                               .xc = Eigen::Vector2d{0, 0}};
+    sol = PiecewiseQuadratic1d{};  // this will get ignored by "merge"
   } else {
     sol = min(objective.C().bottomRows<1>(), ineqs_with_x_limits_sorted);
   }

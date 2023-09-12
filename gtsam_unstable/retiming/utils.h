@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <iomanip>
 #include <unordered_map>
 
 #include <gtsam/base/Testable.h>
@@ -136,8 +137,8 @@ inline Matrix eliminate(const Matrix& src, const Linear& row, const int col) {
   Matrix result(src.rows(), src.cols() - 1);
   // Set left-half
   if (col > 0) {
-    result.leftCols(col - 1) =
-        src.leftCols(col - 1) - src.col(col) / row(col) * row.head(col - 1);
+    result.leftCols(col) =
+        src.leftCols(col) - src.col(col) / row(col) * row.head(col);
   }
   // Set right-half
   if (col < src.cols() - 1) {
@@ -179,5 +180,24 @@ inline void print(const Vector& row, const std::string& s = "",
   std::cout << " " << equalityString << " " << row.tail(1) << std::endl;
 }
 }  // namespace LinearConstraint
+
+template <typename MatrixType>
+struct WithIndent {
+  const MatrixType& mat;
+  const std::string& indent;
+  int width;
+  WithIndent(const MatrixType& mat, const std::string& indent = "\t",
+             int width = 8)
+      : mat(mat), indent(indent), width(width) {}
+
+  friend std::ostream& operator<<(std::ostream& os, const WithIndent& obj) {
+    for (const auto& row : obj.mat.rowwise()) {
+      os << obj.indent;
+      for (const auto& e : row) os << std::setw(obj.width) << e;
+      os << std::endl;
+    }
+    return os;
+  }
+};
 
 }  // namespace gtsam

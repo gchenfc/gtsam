@@ -122,6 +122,12 @@ void AddInPlace(PiecewiseQuadratic& objective1,
 
 void PiecewiseQuadratic1d::MinInPlace(PiecewiseQuadratic1d& q1,
                                       const PiecewiseQuadratic1d& q2) {
+  if ((q2.C.size() == 0) && (q2.xc.size() == 0)) return;
+  if ((q1.C.size() == 0) && (q1.xc.size() == 0)) {
+    q1 = q2;
+    return;
+  }
+
   std::vector<double> xc;
   std::vector<Eigen::Matrix<double, 1, 3>> C;
 

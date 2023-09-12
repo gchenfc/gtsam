@@ -108,8 +108,7 @@ void RetimingFactor::normalizeInequalitiesInplace(Matrix& inequalities) {
 RetimingFactor::shared_ptr RetimingFactor::substitute(
     const size_t& keyIndex, const Linear& equality) const {
   RetimingFactor::shared_ptr result = std::make_shared<RetimingFactor>(
-      keys_,
-      objectives_,  // TODO(gerry): update the objectives
+      keys_, ::gtsam::substitute(objectives_, equality),
       LinearConstraint::eliminate(equalities_, equality, keyIndex),
       LinearConstraint::eliminate(inequalities_, equality, keyIndex));
 

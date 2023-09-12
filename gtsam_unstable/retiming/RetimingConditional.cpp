@@ -79,6 +79,24 @@ double solveInequalityQuadratic(
     const PiecewiseQuadratic& objective,
     const PiecewiseQuadratic::Inequalities& inequalities, const KeyVector& keys,
     const ScalarValues& parents) {
+  // traits<KeyVector>::Print(keys, "  Calling solveInequalityQuadratic on ");
+
+  if (keys.size() == 1) {
+    assertm(inequalities.cols() == 2, "1 variable should have 2 columns");
+    double xmin = -std::numeric_limits<double>::infinity(),
+           xmax = std::numeric_limits<double>::infinity();
+    for (const auto& row : inequalities.rowwise()) {
+      if (row(0) == 1) {
+        xmax = std::min(xmax, row(1));
+      } else if (row(0) == -1) {
+        xmin = std::max(xmin, row(1));
+      } else {
+        throw std::runtime_error("Inequality should be 1 or -1");
+      }
+    }
+    return solveInequalityQuadratic1d(objective.as1d(), xmin, xmax);
+  }
+
   assertm(keys.size() == 2,
           "Quadratic inequality with more than 2 keys not implemented yet");
   assertm(inequalities.cols() == 3, "2 variables should have 3 columns");
@@ -89,6 +107,7 @@ double solveInequalityQuadratic(
   PiecewiseQuadratic1d obj;
 
   // Extract the appropriate keys from parents
+  int col;
   if (parents.find(key1) != parents.end()) {
     if (parents.find(key2) != parents.end()) {
       return objective.evaluate(parents.at(key1), parents.at(key2));
@@ -96,8 +115,10 @@ double solveInequalityQuadratic(
       throw std::runtime_error("TODO");
       equality << 1, 0, parents.at(key1);
       obj = objective.substitute(parents.at(key1));
+      col = 0;
       // auto i =
-      //     std::distance(xc.begin(), std::upper_bound(xc.begin(), xc.end(), x));
+      //     std::distance(xc.begin(), std::upper_bound(xc.begin(), xc.end(),
+      //     x));
       // if (xc.size() > C.rows()) --i;  // compensate for bookends
       // if (i < 0) throw std::runtime_error("x is out of bounds");
     }
@@ -105,6 +126,7 @@ double solveInequalityQuadratic(
     if (parents.find(key2) != parents.end()) {
       equality << 0, 1, parents.at(key2);
       obj = objective.substitute(parents.at(key2));
+      col = 1;
     } else {
       throw std::runtime_error(
           "Solving objective with 2 keys but neither is in parents");
@@ -112,14 +134,15 @@ double solveInequalityQuadratic(
   }
 
   // Substitute parents `equality` and solve the 1d problem with x-bounds.
-  auto bounds = LinearConstraint::eliminate(inequalities, equality, 0);
+  auto bounds = LinearConstraint::eliminate(inequalities, equality, col);
   RetimingConditional::removeRedundantInequalitiesInplace(bounds);
   double xmin = -std::numeric_limits<double>::infinity(),
          xmax = std::numeric_limits<double>::infinity();
   for (const auto& row : bounds.rowwise()) {
     if (row(0) == 1) xmax = std::min(xmax, row(1));
-    if (row(0) == -1) xmin = std::max(xmin, row(1));
+    if (row(0) == -1) xmin = -std::max(xmin, row(1));
   }
+  printf("  Bounds is (%f, %f)\n", xmin, xmax);
   return solveInequalityQuadratic1d(obj, xmin, xmax);
 }
 
@@ -159,22 +182,27 @@ double solveUnconditionalQuadratic(const PiecewiseQuadratic& objective,
 /******************************************************************************/
 
 double RetimingConditional::solve(const ScalarValues& parents) {
-  traits<ScalarValues>::Print(parents, "Calling solve on ");
-  if (equalities().size()) {
-    return solveEqualities(equalities(), keys(), parents);
-  } else if (inequalities().size()) {
-    if (elimination_helpers::AllObjectivesGreedy(objectives())) {
-      return solveInequalitiesGreedily(inequalities(), keys(), parents);
+  // this->print("Calling solve on ");
+  traits<KeyVector>::Print(this->keys(), "Calling solve on");
+  double result = [&]() -> double {
+    if (equalities().size()) {
+      return solveEqualities(equalities(), keys(), parents);
+    } else if (inequalities().size()) {
+      if (elimination_helpers::AllObjectivesGreedy(objectives())) {
+        return solveInequalitiesGreedily(inequalities(), keys(), parents);
+      } else {
+        return solveInequalityQuadratic(PiecewiseQuadratic(objectives()),
+                                        inequalities(), keys(), parents);
+      }
+    } else if (objectives().size()) {
+      return solveUnconditionalQuadratic(PiecewiseQuadratic(objectives()),
+                                         keys(), parents);
     } else {
-      return solveInequalityQuadratic(PiecewiseQuadratic(objectives()),
-                                      inequalities(), keys(), parents);
+      return -std::numeric_limits<double>::infinity();
     }
-  } else if (objectives().size()) {
-    return solveUnconditionalQuadratic(PiecewiseQuadratic(objectives()), keys(),
-                                       parents);
-  } else {
-    return -std::numeric_limits<double>::infinity();
-  }
+  }();
+  std::cout << "  Returning " << result << std::endl;
+  return result;
 }
 
 }  // namespace gtsam
