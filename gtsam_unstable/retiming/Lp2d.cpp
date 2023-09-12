@@ -171,6 +171,11 @@ int traverseSortedToExtremal(const Inequalities& inequalities, int start_index,
 
   const auto& outside_dir = inequalities.col(0);
   bool is_left = outside_dir(start_index) < 0;
+  auto is_connected_edge = [&inequalities, &ccw](int this_edge, int next_edge) {
+    // returns false if the two edges are connected due to unboundedness
+    return isCcw(inequalities.row(this_edge), inequalities.row(next_edge)) ==
+           ccw;
+  };
 
   int min_edge;
   int next_edge = start_index;
@@ -178,11 +183,31 @@ int traverseSortedToExtremal(const Inequalities& inequalities, int start_index,
     min_edge = next_edge;
     next_edge = (ccw ? (min_edge + 1) : (min_edge + inequalities.rows() - 1)) %
                 inequalities.rows();
-  } while (
-      ((outside_dir(next_edge) < 0) == is_left) &&
-      (isCcw(inequalities.row(min_edge), inequalities.row(next_edge)) == ccw));
+  } while (((outside_dir(next_edge) < 0) == is_left) &&
+           (is_connected_edge(min_edge, next_edge)));
 
   return min_edge;
+}
+
+/******************************************************************************/
+
+Point nextVertexFromSorted(const Inequalities& inequalities, int edge_index,
+                           bool ccw) {
+  int next_edge =
+      (edge_index + (ccw ? 1 : inequalities.rows() - 1)) % inequalities.rows();
+  if (isCcw(inequalities.row(edge_index), inequalities.row(next_edge)) == ccw) {
+    return intersection(inequalities.row(edge_index),
+                        inequalities.row(next_edge));
+  } else {
+    // unbounded
+    double x_coeff = inequalities(edge_index, 0);
+    double y_coeff = inequalities(edge_index, 1);
+    double x = ((ccw == (y_coeff < 0)) ? 1 : -1) *
+               std::numeric_limits<double>::infinity();
+    double y = ((ccw == (x_coeff < 0)) ? -1 : 1) *
+               std::numeric_limits<double>::infinity();
+    return Point(x, y);
+  }
 }
 
 /******************************************************************************/

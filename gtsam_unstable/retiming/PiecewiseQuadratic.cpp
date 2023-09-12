@@ -92,9 +92,10 @@ std::pair<PiecewiseQuadratic, Bounds1d> PiecewiseQuadratic::solveParametric(
 }
 
 /******************************************************************************/
-template <typename EigenRow1>
-Eigen::Matrix<double, 1, 3> substitute(const EigenRow1& q, const double m_,
-                                       const double b_) {
+namespace internal {
+Eigen::Matrix<double, 1, 3> substitute(
+    const Eigen::Ref<const Eigen::Matrix<double, 1, 6>>& q, const double m_,
+    const double b_) {
   // x = m_*y + b_
   // x = K*y + k  (re-notate with K, k)
   // a.x^2 + b.y^2 + c.xy + d.x + e.y + f
@@ -105,6 +106,7 @@ Eigen::Matrix<double, 1, 3> substitute(const EigenRow1& q, const double m_,
                                      (2 * a * K * k + c * k + d * K + e),  // y
                                      (a * k * k + d * k + f));             // 1
 }
+}  // namespace internal
 
 /******************************************************************************/
 // Calculates the number of segments in the piecewise quadratic result based on
@@ -241,8 +243,8 @@ PiecewiseQuadratic1d PiecewiseQuadratic::substitute(
   auto func = [&ycs, &Qs, &Q, &m, &b](int x_segment_index, int y_segment_index,
                                       double yc) {
     ycs.push_back(yc);
-    Qs.push_back(::gtsam::substitute(Q.row(x_segment_index), m(y_segment_index),
-                                     b(y_segment_index)));
+    Qs.push_back(::gtsam::internal::substitute(
+        Q.row(x_segment_index), m(y_segment_index), b(y_segment_index)));
   };
   iterateOverXcYcSegments(xc, conditional, func);
 

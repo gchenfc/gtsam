@@ -60,6 +60,14 @@ struct PiecewiseQuadratic1d {
   }
 };
 
+namespace internal {
+/// @brief Substitute a linear equality (x = m.y + b) into a quadratic to obtain
+/// a quadratic in y
+Eigen::Matrix<double, 1, 3> substitute(
+    const Eigen::Ref<const Eigen::Matrix<double, 1, 6>>& q,  //
+    const double m, const double b);
+}  // namespace internal
+
 /**
  * @brief A piecewise quadratic used to define objectives.
  *
@@ -68,13 +76,13 @@ struct PiecewiseQuadratic1d {
  *    NOT THIS: f(x) = [x'; y']^T * Q * [x'; y']
  *              where Q is a 2x2 matrix.
  * This is convenient because:
- *  - we can represent the "piecewise" part with *vectors* a, b, c, d, e, f to
- *    vectorize calculations
+ *  - we can represent the "piecewise" part with *vectors* a, b, c, d, e, f
+ * to vectorize calculations
  *  - parametric solution is easy: x'* = -(c.y + d) / (2a)
  *
- * A piecewise quadratic will be represented with vectors a, b, c, d, e, f, and
- * a vector of dividing points x.  Note that for our application it will always
- * be piecewise in x only.
+ * A piecewise quadratic will be represented with vectors a, b, c, d, e, f,
+ * and a vector of dividing points x.  Note that for our application it will
+ * always be piecewise in x only.
  */
 class PiecewiseQuadratic {
  public:

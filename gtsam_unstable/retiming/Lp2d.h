@@ -58,6 +58,10 @@ bool insertBoundariesSorted(const Inequalities& inequalities,
 int traverseSortedToExtremal(const Inequalities& inequalities, int start_index,
                              bool ccw);
 
+/// @brief Returns the vertex on the given (ccw) side of the given edge
+Point nextVertexFromSorted(const Inequalities& inequalities, int edge_intex,
+                           bool ccw);
+
 /// @brief Check if the inequalities are sorted in counterclockwise order
 bool isCcw(const Inequality& line1, const Inequality& line2);
 

@@ -91,11 +91,24 @@ PiecewiseQuadratic1d min(const Eigen::Ref<const Quadratic>& objective,
   // First traverse until the lower bound
   if (lower_intersection == -1) {
     // No lower bound, so we start at -infinity
-    // qs.emplace_back(objective);
-    // xc.emplace_back(-std::numeric_limits<double>::infinity());
+    xc.emplace_back(-std::numeric_limits<double>::infinity());
   } else {
     // find the final edge (min edge)
-    
+    bool ccw = A(lower_intersection) < 0;
+    int min_edge =
+        lp2d::traverseSortedToExtremal(inequalities, lower_intersection, ccw);
+    if (ccw) {
+      // First add the ccw vertex to edge
+      for (int i = min_edge; i != lower_intersection;
+           i = (i + 1) % inequalities.rows()) {
+        // inequality looks like ax + by <= c, but we need in the form
+        //                        x = m.y + b
+        if (std::abs(A(i)) < 1e-9) continue;  // horizontal line
+        double m = -B(i) / A(i), b = C(i) / A(i);
+        qs.emplace_back(::gtsam::internal::substitute(objective, m, b));
+        xc.emplace_back(xs(i));
+      }
+    }
     // qs.emplace_back(objective);
     // xc.emplace_back(xs(lower_intersection));
   }
