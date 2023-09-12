@@ -35,6 +35,7 @@ PiecewiseQuadratic1d min(const PiecewiseQuadratic& objective,
   }
   Inequalities x_bounds(2, 3);
   Inequalities ineqs_with_x_limits_sorted;
+  // Returns false if infeasible
   auto insert_x_lims = [&inequalities_sorted, &x_bounds,
                         &ineqs_with_x_limits_sorted](double x_min,
                                                      double x_max) -> bool {
@@ -46,15 +47,16 @@ PiecewiseQuadratic1d min(const PiecewiseQuadratic& objective,
 
   // We build-it out by starting with some solution then merging in one at a
   // time
-  // Start with the last one because it has a for loop issue anyway
+  // Start with the last one because it has a for-loop issue anyway
   PiecewiseQuadratic1d sol;
   double last_x_bound = (objective.xc().size() == 0)
                             ? -std::numeric_limits<double>::infinity()
                             : objective.xc().tail<1>().value();
   if (!insert_x_lims(last_x_bound, std::numeric_limits<double>::infinity())) {
     double inf = std::numeric_limits<double>::infinity();
+    // Infinite cost, feasible nowhere
     sol = PiecewiseQuadratic1d{.C = Eigen::Matrix<double, 1, 3>{0, 0, inf},
-                               .xc = Eigen::VectorXd(0)};
+                               .xc = Eigen::Vector2d{0, 0}};
   } else {
     sol = min(objective.C().bottomRows<1>(), ineqs_with_x_limits_sorted);
   }
@@ -63,6 +65,7 @@ PiecewiseQuadratic1d min(const PiecewiseQuadratic& objective,
   double x_min = -std::numeric_limits<double>::infinity();
   for (int i = 0; i < objective.xc().size(); ++i) {
     double x_max = objective.xc()(i);
+    if (x_min == x_max) continue;
     insert_x_lims(x_min, x_max);
     const auto& sol2 = min(objective.C().row(i), ineqs_with_x_limits_sorted);
     PiecewiseQuadratic1d::MinInPlace(sol, sol2);
@@ -157,6 +160,16 @@ void computeObjectiveAlongBoundary(const Inequalities& inequalities,
 
 /******************************************************************************/
 
+/// @brief Computes the gradient of the objective at a given point
+std::pair<double, double> gradient(const Eigen::Ref<const Quadratic>& objective,
+                                   double x, double y) {
+  const auto &a = objective(0), &b = objective(1), &c = objective(2),
+             &d = objective(3), &e = objective(4);  // &f = objective(5);
+  return {2 * a * x + c * y + d, 2 * b * y + c * x + e};
+}
+
+/******************************************************************************/
+
 PiecewiseQuadratic1d min(const Eigen::Ref<const Quadratic>& objective,
                          const Inequalities& inequalities) {
   // Solution to return
@@ -175,37 +188,53 @@ PiecewiseQuadratic1d min(const Eigen::Ref<const Quadratic>& objective,
 
   // Now find where the unconstrained solution intersects the inequalities
   //    Inequalities of the form Ax + By <= C
-  //    Unconstrained sol of the form x = m.y + b
-  const auto &A = inequalities.col(0).array(), &B = inequalities.col(1).array(),
-             &C = inequalities.col(2).array();
-  const auto& ys = (C - A * b) / (A * m + B);
-  const auto& xs = m * ys + b;
-  Eigen::ArrayXXd lhs = (A.matrix() * xs.matrix().transpose() +
-                         B.matrix() * ys.matrix().transpose())
-                            .array();
-  Eigen::ArrayXd rhs = (C + 1e-9).matrix();
-  const auto& is_feasibles = ((lhs.colwise() - rhs) <= 0).colwise().all();
-  // Separate out lower vs upper intersection
-  int lower_intersection = -1, upper_intersection = -1;
-  for (int i = 0; i < is_feasibles.size(); ++i) {
-    if (is_feasibles(i)) {
-      if (B(i) > 0) {  // upper bound
-        if (upper_intersection != -1) {
-          if ((xs(i) != xs(upper_intersection)) ||
-              (ys(i) != ys(upper_intersection))) {
-            assertm(false, "Multiple distinct upper intersections");
-          }
-        }
-        upper_intersection = i;
-      } else {
-        if (lower_intersection != -1) {
-          if ((xs(i) != xs(lower_intersection)) ||
-              (ys(i) != ys(lower_intersection))) {
-            assertm(false, "Multiple distinct lower intersections");
-          }
-        }
-        lower_intersection = i;
+  //    Unconstrained sol of the form ~~~x = m.y + b~~~
+  // x = -(c.y + d) / (2a)
+  // 2a.x + c.y = -d
+  auto xys = lp2d::computeAllIntersections(inequalities, {2 * a, c, -d});
+  const auto& ys = xys.col(1).array();
+
+  const auto [lower_intersection, upper_intersection] =
+      lp2d::computeFeasiblePointPair(inequalities, xys);
+
+  printf("The active inequalities are %d %d\n", lower_intersection,
+         upper_intersection);
+
+  if ((lower_intersection == -1) && (upper_intersection == -1)) {
+    // Could either be unbounded or doesn't intersect with the polygon at all
+    if (lp2d::isFeasible(inequalities, lp2d::Point(b, 0))) {  // unbounded
+      return PiecewiseQuadratic1d{
+          .C = ::gtsam::internal::substitute(objective, m, b),
+          .xc = Eigen::Vector2d{-std::numeric_limits<double>::infinity(),
+                                std::numeric_limits<double>::infinity()}};
+    } else {  // doesn't intersect with polygon - follow the gradient direction
+      // Find lowest edge
+      // Note: min_edge is on the left side of the vertex
+      int min_edge = lp2d::traverseSortedToExtremal(inequalities, 0, true);
+      if ((inequalities(min_edge, 1) > 0) || (inequalities(min_edge, 0) > 0)) {
+        // we are at a max, traverse again to get to min
+        min_edge = (min_edge + 1) % inequalities.rows();
+        min_edge = lp2d::traverseSortedToExtremal(inequalities, min_edge, true);
       }
+      auto min_vertex =
+          lp2d::nextVertexFromSorted(inequalities, min_edge, true);
+      if (gradient(objective, min_vertex(0), min_vertex(1)).first > 0) {
+        // gradient right -> descent left
+        computeObjectiveAlongBoundary(inequalities, objective, min_edge,
+                                      /*to_max*/ true,
+                                      min_vertex(1),  //
+                                      qs, xc);
+      } else {  // gradient left -> descent right
+        // advance min_edge by 1-stop ccw
+        min_edge = (min_edge + 1) % inequalities.rows();
+        computeObjectiveAlongBoundary(inequalities, objective, min_edge,
+                                      /*to_max*/ true,
+                                      min_vertex(1),  //
+                                      qs, xc);
+      }
+      auto ret = PiecewiseQuadratic1d::Create(qs, xc);
+      ret.print("Detected lack of intersection.  Returning: ");
+      return ret;
     }
   }
 
@@ -234,13 +263,7 @@ PiecewiseQuadratic1d min(const Eigen::Ref<const Quadratic>& objective,
                                   qs, xc);
   }
 
-  // Export
-  PiecewiseQuadratic1d sol;
-  sol.C.resize(qs.size(), 3);
-  sol.xc.resize(xc.size());
-  std::copy(qs.begin(), qs.end(), sol.C.rowwise().begin());
-  std::copy(xc.begin(), xc.end(), sol.xc.data());
-  return sol;
+  return PiecewiseQuadratic1d::Create(qs, xc);
 }
 
 }  // namespace qp2d

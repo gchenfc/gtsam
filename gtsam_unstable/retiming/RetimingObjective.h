@@ -51,6 +51,22 @@ struct RetimingObjective {
 
 using RetimingObjectives = std::vector<RetimingObjective>;
 
+template <typename T>
+RetimingObjectives substitute(const RetimingObjectives& objectives,
+                              const T& equality) {
+  RetimingObjectives result;
+  result.reserve(objectives.size());
+  std::transform(objectives.begin(), objectives.end(),
+                 std::back_inserter(result),
+                 [equality](const RetimingObjective& objective) {
+                   return objective.isGreedy
+                              ? objective
+                              : RetimingObjective(
+                                    objective.quadratic.substitute(equality));
+                 });
+  return result;
+}
+
 // traits for Testable
 template <>
 struct traits<RetimingObjective> : public Testable<RetimingObjective> {};

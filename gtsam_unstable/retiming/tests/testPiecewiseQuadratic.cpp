@@ -208,6 +208,31 @@ TEST(PiecewiseQuadratic, solve_parametric) {
   EXPECT(assert_equal(expected_objective, actual_objective, 1e-9));
 }
 
+TEST(PiecewiseQuadratic, solve) {
+  Vector2 a{0.5, 0.8};
+  Vector2 b{3.0, 1.0};
+  Vector2 c{0.0, -1.2};
+  Vector2 d{0.5, 0.0};
+  Vector2 e{-0.6, 0.0};
+  Vector2 f{0.155, 0.0};
+  Vector1 xc{0.0};
+  PiecewiseQuadratic q(a, b, c, d, e, f, xc);
+
+  // Check Qp2d_example.ipynb to see where the optimal values should be
+  EXPECT_DOUBLES_EQUAL(0.0, q.argmin(-1), 1e-9);  // 0
+  EXPECT_DOUBLES_EQUAL(0.0, q.argmin(-0.5), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.0, q.argmin(-0.01), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.0075, q.argmin(0.01), 1e-9);  // right line x = 0.75y
+  EXPECT_DOUBLES_EQUAL(0.05175, q.argmin(0.069), 1e-9);
+  EXPECT_DOUBLES_EQUAL(-0.5, q.argmin(0.071), 1e-9);  // switch to x = -0.5
+  EXPECT_DOUBLES_EQUAL(-0.5, q.argmin(0.17), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.135, q.argmin(0.18), 1e-9);  // back to x = 0.75y
+  EXPECT_DOUBLES_EQUAL(0.225, q.argmin(0.3), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.6375, q.argmin(0.85), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.645, q.argmin(0.86), 1e-9);  // no inequalities so stay
+  EXPECT_DOUBLES_EQUAL(0.7425, q.argmin(0.99), 1e-9);  // no inequalities so stay
+}
+
 /* ************************************************************************* */
 int main() {
   TestResult tr;

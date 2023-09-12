@@ -126,7 +126,8 @@ EliminateQp2d(const RetimingFactor& factor, KeyVector& keys) {
   // original factor like with Lp2d
   return {/*Conditional*/ std::make_shared<RetimingConditional>(factor),
           /*   Joint   */ std::make_shared<RetimingFactor>(
-              keys, RetimingObjectives{RetimingObjective(new_objective)},
+              KeyVector{keys.back()},
+              RetimingObjectives{RetimingObjective(new_objective)},
               factor.equalities(), new_constraint)};
 }
 

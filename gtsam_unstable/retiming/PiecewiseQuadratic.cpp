@@ -11,6 +11,77 @@ using Vec = PiecewiseQuadratic::Vec;
 
 /******************************************************************************/
 
+double PiecewiseQuadratic1d::argmin() const {
+  bool has_bounds = (xc.size() > C.rows());
+
+  double min = std::numeric_limits<double>::infinity(), minx = 0;
+
+  double x_left = has_bounds ? xc(0) : -std::numeric_limits<double>::infinity();
+  // Iterate over every segment
+  for (int segment_i = 0; segment_i < C.rows(); ++segment_i) {
+    double x_right = ((segment_i + (has_bounds ? 1 : 0)) < xc.size())
+                         ? xc(segment_i + (has_bounds ? 1 : 0))
+                         : std::numeric_limits<double>::infinity();
+    const auto &a = C(segment_i, 0), &b = C(segment_i, 1), &c = C(segment_i, 2);
+    double center = -b / 2 / a;
+    if ((x_left <= center) && (center <= x_right)) {
+      double y = a * center * center + b * center + c;
+      if (y < min) {
+        min = y;
+        minx = center;
+      }
+    } else {
+      double y_left = a * x_left * x_left + b * x_left + c;
+      double y_right = a * x_right * x_right + b * x_right + c;
+      if (y_left < min) {
+        min = y_left;
+        minx = x_left;
+      }
+      if (y_right < min) {
+        min = y_right;
+        minx = x_right;
+      }
+    }
+    x_left = x_right;
+  }
+
+  return minx;  //
+}
+
+/******************************************************************************/
+
+/// Substitute a value for y into the quadratic to obtain a new piecewise
+/// quadratic on y (one variable, so b, c, e = 0)
+PiecewiseQuadratic1d PiecewiseQuadratic::substitute(double y) const {
+  // a.x^2 + b.y^2 + c.x.y + d.x + e.y + f
+  // a.x^2 + (c.y + d).x + (b.y^2 + e.y + f)
+  PiecewiseQuadratic1d result{
+      Eigen::Matrix<double, Eigen::Dynamic, 3>(C_.rows(), 3), xc_};
+  result.C << (C_.col(0)), (C_.col(2) * y + C_.col(3)),
+      (C_.col(1) * y * y + C_.col(4) * y + C_.col(5));
+  return result;
+}
+
+/******************************************************************************/
+
+/// The opposite of the constructor from PiecewiseQuadratic1d.  If the columns
+/// are 0, then we can convert to PiecewiseQuadratic1d.
+PiecewiseQuadratic1d PiecewiseQuadratic::as1d(bool check_columns) const {
+  if (check_columns) {
+    if ((C_.col(1).array() != 0).any() || (C_.col(2).array() != 0).any() ||
+        (C_.col(4).array() != 0).any()) {
+      throw std::runtime_error(
+          "PiecewiseQuadratic::as1d: Columns 1, 2, 4 must be 0");
+    }
+  }
+  PiecewiseQuadratic1d result{
+      Eigen::Matrix<double, Eigen::Dynamic, 3>(C_.rows(), 3), xc_};
+  result.C << C_.col(0), C_.col(3), C_.col(5);
+  return result;
+}
+
+/******************************************************************************/
+
 /// Add another objective, in-place
 void AddInPlace(PiecewiseQuadratic& objective1,
                 const PiecewiseQuadratic& objective2) {
@@ -237,15 +308,22 @@ void PiecewiseQuadratic1d::MinInPlace(PiecewiseQuadratic1d& q1,
 
 void PiecewiseQuadratic1d::SmoothenInPlace(
     std::vector<Eigen::Matrix<double, 1, 3>>& C, std::vector<double>& xc) {
-  // TODO(gerry): implement
+  int offset = (xc.size() > C.size()) ? 0 : 1;
+  for (int i = 0; i < xc.size() - 2 + offset; ++i) {
+    if ((xc.at(i + offset) == xc.at(i + 1 + offset)) ||
+        (C.at(i) == C.at(i + 1))) {
+      // delete this row
+      C.erase(C.begin() + i + offset);
+      xc.erase(xc.begin() + i + 1);
+    }
+  }
   return;
 }
 
 /******************************************************************************/
 
 void PiecewiseQuadratic1d::SmoothenInPlace(PiecewiseQuadratic1d& q) {
-  // TODO(gerry): implement
-  return;
+  throw std::runtime_error("Not implemented");
 }
 
 /******************************************************************************/
@@ -460,6 +538,83 @@ PiecewiseQuadratic1d PiecewiseQuadratic::substitute(
   std::copy(Qs.begin(), Qs.end(), result.C.rowwise().begin());
   std::copy(ycs.begin(), ycs.end() - 1, result.xc.begin());
   return result;
+}
+
+/******************************************************************************/
+
+PiecewiseQuadratic1d PiecewiseQuadratic::substitute(
+    const LinearConstraint::Linear& conditional) const {
+  assertm(conditional.cols() == 3, "conditional must be 3-dimensional");
+  // a.x^2 + b.y^2 + c.x.y + d.x + e.y + f
+  // i.x + j.y = k
+  double m_ = -conditional(1) / conditional(0);
+  double b_ = conditional(2) / conditional(0);
+
+  PiecewiseQuadratic1d result{
+      Eigen::Matrix<double, Eigen::Dynamic, 3>(C_.rows(), 3), xc_};
+
+  const auto &a = C_.col(0), &b = C_.col(1), &c = C_.col(2), &d = C_.col(3),
+             &e = C_.col(4), &f = C_.col(5);
+  const double &K = m_, &k = b_;
+  result.C << (a * K * K + b + c * K),      // y^2
+      (2 * a * K * k + c * k + d * K + e),  // y
+      (a * k * k + d * k + f);              // 1
+
+  return result;
+}
+
+/******************************************************************************/
+
+PiecewiseQuadratic PiecewiseQuadratic::swapXy(const PiecewiseQuadratic& src) {
+  assertm(src.xc().size() == 0,
+          "We cannot rekey if there are piecewise components in x");
+  // swap x and y
+  PiecewiseQuadratic result;
+  result.C().resize(src.C().rows(), 6);
+  //            x^2         y^2        xy        x          y          1
+  result.C() << src.C().col(1), src.C().col(0), src.C().col(2), src.C().col(4),
+      src.C().col(3), src.C().col(5);
+  result.xc() = src.xc();
+  return result;
+}
+
+/******************************************************************************/
+
+PiecewiseQuadratic PiecewiseQuadratic::rekey(const KeyVector& src_keys,
+                                             const KeyVector& dest_keys) const {
+  assertm((dest_keys.size() == 2) || (dest_keys.size() == 1),
+          "dest_keys must be 1 or 2-dimensional");
+  assertm((src_keys.size() == 2) || (src_keys.size() == 1),
+          "src_keys must be 1 or 2-dimensional");
+
+  // 1 -> 1 key case
+  if (dest_keys.size() == 1) {
+    assertm(src_keys.size() == 1,
+            "If dest_keys is 1-dimensional then src_keys must as well");
+    return *this;
+  }
+
+  // 1 -> 2 key case
+  if (src_keys.size() == 1) {
+    assertm((C_.col(1).array() == 0).all(), "y^2 term must be zero");
+    assertm((C_.col(2).array() == 0).all(), "xy term must be zero");
+    assertm((C_.col(4).array() == 0).all(), "y term must be zero");
+    if (src_keys.at(0) == dest_keys.at(0)) return *this;
+    assertm(src_keys.at(0) == dest_keys.at(1),
+            "rekey source and destination "
+            "keys didn't match");
+    return swapXy(*this);
+  }
+
+  // 2 -> 2 key case
+  const auto &s1 = src_keys.at(0), &s2 = src_keys.at(1);
+  const auto &d1 = dest_keys.at(0), &d2 = dest_keys.at(1);
+  if ((s1 == d1) && (s2 == d2)) return *this;
+  if ((s1 == d2) && (s2 == d1)) {
+    return swapXy(*this);
+  }
+
+  throw std::runtime_error("rekey source and destination keys didn't match");
 }
 
 }  // namespace gtsam

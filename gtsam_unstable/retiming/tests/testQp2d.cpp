@@ -87,7 +87,7 @@ TEST(Qp2d, min_single_quadratic) {
 }
 
 /* ************************************************************************* */
-TEST(Qp2d, solve_parametric) {
+TEST(Qp2d, min) {
   // See Qp2d_example.ipynb
   // z1: [0.5, 3, 0, 0.5, -0.6, 0.155]
   // z2: [0.8, 1, -1.2, 0, 0, 0]
@@ -138,6 +138,42 @@ TEST(Qp2d, solve_parametric) {
 
   // Compare to the expected objective function
   EXPECT(assert_equal(expected_objective, actual_objective, 1e-9));
+}
+
+TEST(Qp2d, min_2) {
+  std::cout << "************ TEST OF INTEREST **************" << std::endl;
+  //         Inequality Constraint: 1*x2 + 0*x3 <= 0.3044
+  //         Inequality Constraint: -0.96*x2 + 2*x3 <= 0.1
+  // combined objective is C:
+  //        1        0        0     -0.6        0     0.31
+  //  5.34028        0        0 -2.28403        0 0.473351
+  // xc:
+  // 0.194
+
+  Inequalities inequalities(2, 3);
+  inequalities << 1, 0, 0.3044,  //
+      -0.96, 2, 0.1;             //
+  PiecewiseQuadratic q(Vector2{1.0, 5.34028}, Vector2{0.0, 0.0},
+                       Vector2{0.0, 0.0}, Vector2{-0.6, -2.28403},
+                       Vector2{0.0, 0.0}, Vector2{0.31, 0.473351},
+                       Vector1{0.194});
+
+  Bounds1d actual_bounds;
+  auto actual_objective = qp2d::min(q, inequalities, &actual_bounds);
+
+  // Compare to expected bounds on y <= 0.196112
+  double inf = std::numeric_limits<double>::infinity();
+  Bounds1d expected_bounds = (Bounds1d() << 1, 0.196112, -1, -inf).finished();
+  EXPECT(assert_equal(expected_bounds, actual_bounds, 1e-9));
+
+  // Compare to the expected objective function
+  // https://photos.app.goo.gl/8ejSwagsMhBSiLy5A
+  PiecewiseQuadratic1d expected_objective{
+      .C = (Matrix(2, 3) << 0, 0, 0.2291319216,  //
+            23.1782986111, -7.07622569444, 0.7692155382)
+               .finished(),
+      .xc = Vector1(0.1526476514)};
+  EXPECT(assert_equal(expected_objective, actual_objective, 1e-6));
 }
 
 /* ************************************************************************* */

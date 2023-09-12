@@ -62,6 +62,17 @@ int traverseSortedToExtremal(const Inequalities& inequalities, int start_index,
 Point nextVertexFromSorted(const Inequalities& inequalities, int edge_index,
                            bool ccw);
 
+/// @brief Compute the intersection points of a line with the inequalities
+/// This is a vectorized version of `intersection` below
+Eigen::Array<double, Eigen::Dynamic, 2> computeAllIntersections(
+    const Inequalities& inequalities, const Inequality& line);
+
+/// @brief Computes the indices of the feasible points
+std::pair<int, int> computeFeasiblePointPair(
+    const Inequalities& inequalities,
+    const Eigen::Array<double, Eigen::Dynamic, 2>& intersections,
+    double tol = 1e-12);
+
 /// @brief Check if the inequalities are sorted in counterclockwise order
 bool isCcw(const Inequality& line1, const Inequality& line2);
 

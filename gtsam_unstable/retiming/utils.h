@@ -63,7 +63,7 @@ template <typename T>
 void rekey_and_append(const std::vector<T>& src, const KeyVector& src_keys,
                       const KeyVector& dest_keys, std::vector<T>& dest) {
   dest.reserve(dest.size() + src.size());
-  for (const T& e : src) dest.push_back(e.rekey(dest_keys, src_keys));
+  for (const T& e : src) dest.push_back(e.rekey(src_keys, dest_keys));
 }
 /// Rekey for std::vector by calling rekey on each element
 template <typename T>

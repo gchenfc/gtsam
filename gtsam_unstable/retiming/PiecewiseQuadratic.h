@@ -38,6 +38,17 @@ struct PiecewiseQuadratic1d {
   Eigen::Matrix<double, Eigen::Dynamic, 3> C;
   Eigen::VectorXd xc;
 
+  /// @brief Construct from std::vectors
+  static PiecewiseQuadratic1d Create(
+      const std::vector<Eigen::Matrix<double, 1, 3>>& Cs,
+      const std::vector<double>& xcs) {
+    PiecewiseQuadratic1d result{decltype(C)(Cs.size(), 3),
+                                decltype(xc)(xcs.size())};
+    std::copy(Cs.begin(), Cs.end(), result.C.rowwise().begin());
+    std::copy(xcs.begin(), xcs.end(), result.xc.data());
+    return result;
+  }
+
   /// @brief Takes the min of a pair of piecewise quadratics
   static void MinInPlace(PiecewiseQuadratic1d& q1,
                          const PiecewiseQuadratic1d& q2);
@@ -50,16 +61,21 @@ struct PiecewiseQuadratic1d {
                               std::vector<double>& xc);
 
   /// @brief Evaluate the piecewise quadratic at a point x
-  double evaluate(double x) {
+  double evaluate(double x) const {
     auto i =
         std::distance(xc.begin(), std::upper_bound(xc.begin(), xc.end(), x));
+    if (xc.size() > C.rows()) --i;  // compensate for bookends
+    if (i < 0) throw std::runtime_error("x is out of bounds");
     return C(i, 0) * x * x + C(i, 1) * x + C(i, 2);
   }
+
+  /// @brief Evaluate the global minimum location x
+  double argmin() const;
 
   // Testable
   void print(const std::string& s = "Piecewise Quadratic 1d",
              const KeyFormatter& formatter = DefaultKeyFormatter) const {
-    std::cout << s << "C:\n" << C << "\nxc:\n" << xc << std::endl;
+    std::cout << s << "C:\n" << C << "\nxc: " << xc.transpose() << std::endl;
   }
   bool equals(const PiecewiseQuadratic1d& other, double tol = 1e-9) const {
     return traits<decltype(C)>::Equals(C, other.C, tol) &&
@@ -144,7 +160,8 @@ class PiecewiseQuadratic {
   double evaluate(double x, double y) const;
 
   /// Solve a parametric, piecewise QP with linear inequalities to obtain a
-  /// piecewise linear solution x^*(y) and inequality bounds on the argument y.
+  /// piecewise linear solution f(x^*(y), y) and inequality bounds on the
+  /// argument y.
   std::pair<PiecewiseQuadratic, Bounds1d> solveParametric(
       const Inequalities& inequalities) const;
 
@@ -154,6 +171,23 @@ class PiecewiseQuadratic {
   /// for solveParametric to return the objective function rather than the
   /// conditional, but it's good practice I guess
   PiecewiseQuadratic1d substitute(const PiecewiseLinear& conditional) const;
+
+  /// Substitute a linear solution x^*(y) into the quadratic to obtain
+  /// a new piecewise quadratic on y (one variable, so b, c, e = 0).
+  /// conditional should take the form ax + by = c
+  PiecewiseQuadratic1d substitute(
+      const LinearConstraint::Linear& conditional) const;
+
+  /// Substitute a value for y into the quadratic to obtain a new piecewise
+  /// quadratic on y (one variable, so b, c, e = 0)
+  PiecewiseQuadratic1d substitute(double y) const;
+
+  /// The opposite of the constructor from PiecewiseQuadratic1d.  If the columns
+  /// are 0, then we can convert to PiecewiseQuadratic1d.
+  PiecewiseQuadratic1d as1d(bool check_columns = true) const;
+
+  /// @brief Solve argmin, given y
+  double argmin(double y) const { return substitute(y).argmin(); }
 
   /// Applies `func` to each of the segments where we have a distinct region
   /// between the quadratic (piecewise over x) and conditional (linear piecewise
@@ -167,13 +201,12 @@ class PiecewiseQuadratic {
       const std::function<void(int x_segment_index, int y_segment_index,
                                double y_upper_bound)>& func);
 
-  // TODO(gerry): implementation
+  /// Swap the x/y variables
+  static PiecewiseQuadratic swapXy(const PiecewiseQuadratic& src);
+
+  /// Potentially swap the columns of C_ if we want to reverse the key order
   PiecewiseQuadratic rekey(const KeyVector& src_keys,
-                           const KeyVector& dest_keys) const {
-    std::cout << "Warning: Piecewise Quadratic not yet implemented"
-              << std::endl;
-    return *this;
-  }
+                           const KeyVector& dest_keys) const;
 
   // Testable
   void print(const std::string& s = "Piecewise Quadratic",

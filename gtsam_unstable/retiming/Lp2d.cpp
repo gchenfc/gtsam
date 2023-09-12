@@ -214,6 +214,66 @@ Point nextVertexFromSorted(const Inequalities& inequalities, int edge_index,
 
 /******************************************************************************/
 
+Eigen::Array<double, Eigen::Dynamic, 2> computeAllIntersections(
+    const Inequalities& inequalities, const Inequality& line) {
+  // Vectorized version of `intersection` below
+  const auto &A = inequalities.col(0), &B = inequalities.col(1),
+             &E = inequalities.col(2);
+  const auto &c = line(0), &d = line(1), &e = line(2);
+
+  const auto& inv_determinant = 1 / (A * d - B * c).array();
+  Eigen::Array<double, Eigen::Dynamic, 2> intersections(inequalities.rows(), 2);
+  intersections.col(0) = (d * E - B * e).array() * inv_determinant;
+  intersections.col(1) = (-c * E + A * e).array() * inv_determinant;
+  return intersections;
+}
+
+/******************************************************************************/
+
+/// @brief Computes the indices of the feasible points
+std::pair<int, int> computeFeasiblePointPair(
+    const Inequalities& inequalities,
+    const Eigen::Array<double, Eigen::Dynamic, 2>& intersections, double tol) {
+  const auto &A = inequalities.col(0).array(), &B = inequalities.col(1).array(),
+             &C = inequalities.col(2).array();
+  const auto& xs = intersections.col(0);
+  const auto& ys = intersections.col(1);
+
+  Eigen::ArrayXXd lhs = (A.matrix() * xs.matrix().transpose() +
+                         B.matrix() * ys.matrix().transpose())
+                            .array();
+  Eigen::ArrayXd rhs = (C + tol).matrix();
+  const auto& is_feasibles = ((lhs.colwise() - rhs) <= 0).colwise().all();
+
+  // Separate out lower vs upper intersection
+  int lower_intersection = -1, upper_intersection = -1;
+  for (int i = 0; i < is_feasibles.size(); ++i) {
+    if (is_feasibles(i)) {
+      if (B(i) > 0) {  // upper bound
+        if (upper_intersection != -1) {
+          if ((xs(i) != xs(upper_intersection)) ||
+              (ys(i) != ys(upper_intersection))) {
+            assertm(false, "Multiple distinct upper intersections");
+          }
+        }
+        upper_intersection = i;
+      } else {
+        if (lower_intersection != -1) {
+          if ((xs(i) != xs(lower_intersection)) ||
+              (ys(i) != ys(lower_intersection))) {
+            assertm(false, "Multiple distinct lower intersections");
+          }
+        }
+        lower_intersection = i;
+      }
+    }
+  }
+
+  return {lower_intersection, upper_intersection};
+}
+
+/******************************************************************************/
+
 bool isCcw(const Inequality& line1, const Inequality& line2) {
   // Check if the inequalities are going ccw or cw.  Return true for ccw
   return (line1(0) * line2(1) - line1(1) * line2(0)) > 0;

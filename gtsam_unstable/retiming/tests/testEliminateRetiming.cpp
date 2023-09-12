@@ -274,6 +274,69 @@ TEST(eliminate, eliminate_control_limited_dynamics) {
 }
 
 /* ************************************************************************* */
+TEST(eliminate, eliminate_quadratic_objectives) {
+  // System Dynamics:
+  //    x_{k+1} = 0.98 * x_k + 0.5 * u_k
+  //    x_0 = 1.0
+  //    ~~x_1 <= 0.3
+  //    u_k + x_k <= 0.1
+  //
+  // Expect solution to be:
+  //    x0 = 1.0, u0 = -1.36  // So that x1 = 0.3
+  //    x1 = 0.3, u1 = -0.2
+  //    x2 = 0.194, u2 = -0.094
+  //    x3 = 0.14312, u3 = -0.04312
+  //    ...
+  //    xinf = 0.1 / 1.04 = 0.09615384615, uinf = -0.00384615385
+
+  static constexpr int N = 30;
+
+  RetimingFactorGraph factors;
+  for (int i = 0; i < N; ++i) {
+    factors.push_back(RetimingFactor::Objective(
+        {X(i)}, PiecewiseQuadratic(1, 0, 0, -0.6, 0, 0)));
+    factors.push_back(RetimingFactor::Equality(
+        {X(i + 1), X(i), U(i)}, LinConstr({-1.0, 0.98, 0.5}, 0.0)));
+    factors.push_back(
+        RetimingFactor::Inequality({U(i), X(i)}, LinConstr({1, 1}, 0.1)));
+  }
+  factors.push_back(RetimingFactor::Equality({X(0)}, LinConstr({1}, 1.0)));
+  factors.push_back(RetimingFactor::Inequality({X(8)}, LinConstr({1}, -0.25)));
+
+  std::cout << "THIS IS THE REAL TEST ***************************" << std::endl;
+
+  Ordering ordering;
+  for (int i = 0; i < N; ++i) {
+    ordering.push_back(U(i));
+  }
+  for (int i = 0; i <= N; ++i) {
+    ordering.push_back(X(i));
+  }
+  // auto bn = factors.eliminateSequential();  // COLAMD
+  // CHECK(bn);
+  // auto sol = bn->optimize();
+  auto bn1 = factors.eliminateSequential(ordering);
+  CHECK(bn1);
+  auto sol1 = bn1->optimize();
+
+  // Print Solution nicely
+  auto printSol = [](const ScalarValues& sol) {
+    for (int i = 0; i < N; ++i) {
+      std::cout << "\tx" << i << " = " << sol.at(X(i)) << ", u" << i << " = "
+                << sol.at(U(i)) << "\n";
+    }
+    std::cout << "\txN = " << sol.at(X(N)) << "\n";
+  };
+  // bn->print("Bayes Net:");
+  // traits<ScalarValues>::Print(sol, "SOLUTION:");
+  // printSol(sol);
+  // bn1->print("Bayes Net:");
+  traits<ScalarValues>::Print(sol1, "SOLUTION:");
+  printSol(sol1);
+
+}
+
+/* ************************************************************************* */
 int main() {
   TestResult tr;
   return TestRegistry::runAllTests(tr);
