@@ -183,7 +183,7 @@ void PiecewiseQuadratic::iterateOverXcYcSegments(
     } else {  // right-to-left
       auto it_right = std::upper_bound(xc.begin(), xc.end(), x1);
       auto it_left = it_right - 1;
-      for (; (it_left >= xc.begin()) && (*it_left > x2);
+      for (; (std::distance(xc.begin(), it_left) >= 0) && (*it_left > x2);
            --it_left, --it_right) {
         func(std::distance(xc.begin(), it_right), y_segment_index,
              intersect(*it_left));

@@ -59,7 +59,7 @@ int traverseSortedToExtremal(const Inequalities& inequalities, int start_index,
                              bool ccw);
 
 /// @brief Returns the vertex on the given (ccw) side of the given edge
-Point nextVertexFromSorted(const Inequalities& inequalities, int edge_intex,
+Point nextVertexFromSorted(const Inequalities& inequalities, int edge_index,
                            bool ccw);
 
 /// @brief Check if the inequalities are sorted in counterclockwise order

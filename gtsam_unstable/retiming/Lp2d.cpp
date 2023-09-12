@@ -170,6 +170,7 @@ int traverseSortedToExtremal(const Inequalities& inequalities, int start_index,
   if (inequalities.rows() == 1) return 0;
 
   const auto& outside_dir = inequalities.col(0);
+  if (outside_dir(start_index) == 0) return start_index;
   bool is_left = outside_dir(start_index) < 0;
   auto is_connected_edge = [&inequalities, &ccw](int this_edge, int next_edge) {
     // returns false if the two edges are connected due to unboundedness
@@ -184,6 +185,7 @@ int traverseSortedToExtremal(const Inequalities& inequalities, int start_index,
     next_edge = (ccw ? (min_edge + 1) : (min_edge + inequalities.rows() - 1)) %
                 inequalities.rows();
   } while (((outside_dir(next_edge) < 0) == is_left) &&
+           (outside_dir(next_edge) != 0) &&
            (is_connected_edge(min_edge, next_edge)));
 
   return min_edge;

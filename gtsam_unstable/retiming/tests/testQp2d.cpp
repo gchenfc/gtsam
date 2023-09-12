@@ -22,6 +22,7 @@
 #include <gtsam/base/Matrix.h>
 #include <gtsam/base/VectorSpace.h>  // Matrix traits
 
+#include <gtsam_unstable/retiming/Lp2d.h>
 #include <gtsam_unstable/retiming/PiecewiseLinear.h>
 #include <gtsam_unstable/retiming/PiecewiseQuadratic.h>
 
@@ -32,7 +33,63 @@ using Inequalities = Eigen::Matrix<double, Eigen::Dynamic, 3>;
 using Bounds1d = Eigen::Matrix<double, 2, 2>;
 
 /* ************************************************************************* */
+TEST(Qp2d, min_single_quadratic) {
+  // See Qp2d_example.ipynb
+  // ~~~z1: [0.5, 3, 0, 0.5, -0.6, 0.155]~~~
+  // z2: [0.8, 1, -1.2, 0, 0, 0]
+
+  Vector2 a{0.5, 0.8};
+  Vector2 b{3.0, 1.0};
+  Vector2 c{0.0, -1.2};
+  Vector2 d{0.5, 0.0};
+  Vector2 e{-0.6, 0.0};
+  Vector2 f{0.155, 0.0};
+  Vector1 xc{0.0};
+  PiecewiseQuadratic q2(a, b, c, d, e, f, xc);
+  qp2d::Quadratic q1d = q2.C().bottomRows<1>();
+  PiecewiseQuadratic q(q1d(0), q1d(1), q1d(2), q1d(3), q1d(4), q1d(5));
+
+  Inequalities inequalities(9, 3);
+  inequalities << 1.0, 0.0, 1.0,  // x <= 1
+      -1.0, 0.0, 1.0,             // x >= -1
+      0.0, 1.0, 1.0,              // y <= 1
+      0.0, -1.0, 1.0,             // y >= -1
+      1.0, 1.0, 1.5,              // x + y <= 1.5
+      -1.0, -1.0, 1.5,            // x + y >= -1.5
+      1.0, -1.0, 1.5,             // x - y <= 1.5
+      -1.0, 1.0, 1.5,             // x - y >= -1.5
+      -1, 0, 0;                   // x >= 0, so we only get z2
+
+  Inequalities sorted;
+  CHECK(lp2d::sortBoundaries(inequalities, sorted));
+  auto actual_objective = qp2d::min(q1d, sorted);
+
+  // Construct the expected x^*(y) piecewise linear solution.
+  //    x = 0,        for y < 0
+  //    x = 0.75 * y, for 0 <= y <= 6/7
+  //    x = 1.5 - y,  for 6/7 < y <= 1
+  // Quadratic is:
+  //    0.8 * x^2 + 1 * y^2 - 1.2 * x * y
+  // Objectives are:
+  //    1 * y^2 + 0 * y + 0,      for -1 < y < 0
+  //    0.55 * y^2 + 0 * y + 0,   for 0 <= y <= 6/7
+  //    3 * y^2 - 4.2 * y + 1.8,  for 6/7 < y <= 1
+  // Note that we for this function, we explicitly return the -1, +1 bounds
+  PiecewiseQuadratic1d expected_objective{
+      .C = (Matrix(3, 3) << 1, 0, 0,  //
+            0.55, 0, 0,               //
+            3, -4.2, 1.8)
+               .finished(),
+      .xc = (Vector(4) << -1, 0, 6.0 / 7.0, 1).finished()};
+
+  // Compare to the expected objective function
+  EXPECT(assert_equal(expected_objective, actual_objective, 1e-9));
+}
+
+/* ************************************************************************* */
 TEST(Qp2d, solve_parametric) {
+  CHECK(false);  // Temporarily disable this before I've implemented minInPlace
+
   // See Qp2d_example.ipynb
   // z1: [0.5, 3, 0, 0.5, -0.6, 0.155]
   // z2: [0.8, 1, -1.2, 0, 0, 0]
@@ -66,7 +123,7 @@ TEST(Qp2d, solve_parametric) {
 
   // Construct the expected x^*(y) piecewise linear solution.
   double xc2 = 0.0700194588625913, xc3 = 0.17487850032108213;
-  Eigen::Matrix<double, 4, 3> expected_m_b_yc;
+  Eigen::Matrix<double, 5, 3> expected_m_b_yc;
   expected_m_b_yc << 0, 0, 0,  // x = 0, for y < 0
       0.75, 0, xc2,            // x = 0.75 * y, for 0 <= y <= xc2
       0, -0.5, xc3,            // x = -0.5, for xc2 < y <= xc3
