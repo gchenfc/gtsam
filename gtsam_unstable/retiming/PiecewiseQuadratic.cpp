@@ -50,7 +50,200 @@ void AddInPlace(PiecewiseQuadratic& objective1,
 
 void PiecewiseQuadratic1d::MinInPlace(PiecewiseQuadratic1d& q1,
                                       const PiecewiseQuadratic1d& q2) {
-  throw std::runtime_error("TODO");
+  std::vector<double> xc;
+  std::vector<Eigen::Matrix<double, 1, 3>> C;
+
+  const auto& xc1 = q1.xc;
+  const auto& xc2 = q2.xc;
+  const auto& C1 = q1.C;
+  const auto& C2 = q2.C;
+
+  bool has_endpoints = xc1.size() == (C1.rows() + 1);
+  assertm(has_endpoints == (xc2.size() == (C2.rows() + 1)),
+          "PiecewiseQuadratic1d::MinInPlace: Either both or neither should use "
+          "endpoints");
+
+  // Insert the min of 2 quadratics within 1 region
+  auto insertMinInRegion =
+      [&C1, &C2](double x_min, double x_max,  //
+                 int segment1, int segment2, std::vector<double>& xc,
+                 std::vector<Eigen::Matrix<double, 1, 3>>& C) {
+        const auto &a1 = C1(segment1, 0), &b1 = C1(segment1, 1),
+                   &c1 = C1(segment1, 2), &a2 = C2(segment2, 0),
+                   &b2 = C2(segment2, 1), &c2 = C2(segment2, 2);
+
+        // Find intersections
+        double a = a1 - a2, b = b1 - b2, c = c1 - c2;
+        double discriminant = b * b - 4 * a * c;
+        if (discriminant <= 0) {
+          // No intersection, just take the min
+          bool take_1 = (c == 0) ? (a < 0) : (c < 0);
+          C.push_back(take_1 ? C1.row(segment1) : C2.row(segment2));
+          xc.push_back(x_max);
+        } else if (std::abs(a) < 1e-9) {
+          // 1 intersection point
+          const auto& C_left = (b < 0) ? C2.row(segment2) : C1.row(segment1);
+          const auto& C_right = (b < 0) ? C1.row(segment1) : C2.row(segment2);
+          double x = -c / b;
+          if (x_max <= x) {
+            C.push_back(C_left);
+            xc.push_back(x_max);
+          } else {
+            if (x_min <= x) {
+              C.push_back(C_left);
+              xc.push_back(x);
+            }
+            C.push_back(C_right);
+            xc.push_back(x_max);
+          }
+        } else {
+          // Intersection, split into 3 segments
+          double x_mid = -b / (2 * a);
+          double y_diff_mid = a * x_mid * x_mid + b * x_mid + c;
+          const auto& outer_sol =
+              (y_diff_mid < 0) ? C2.row(segment2) : C1.row(segment1);
+          const auto& inner_sol =
+              (y_diff_mid < 0) ? C1.row(segment1) : C2.row(segment2);
+          double root_radius = std::sqrt(discriminant) / std::abs(2 * a);
+          double xa = x_mid - root_radius, xb = x_mid + root_radius;
+
+          if (x_max <= xa) {
+            C.push_back(outer_sol);
+            xc.push_back(x_max);
+          } else if (x_max <= xb) {
+            if (x_min < xa) {
+              C.push_back(outer_sol);
+              xc.push_back(xa);
+            }
+            C.push_back(inner_sol);
+            xc.push_back(x_max);
+          } else {  // x_max > xb
+            if (x_min < xa) {
+              C.push_back(outer_sol);
+              xc.push_back(xa);
+            }
+            if (x_min < xb) {
+              C.push_back(inner_sol);
+              xc.push_back(xb);
+            }
+            C.push_back(outer_sol);
+            xc.push_back(x_max);
+          }
+        }
+        return;
+      };
+
+  // Double-loop to find every intersection point
+  auto x1 = xc1.begin(), x2 = xc2.begin();
+  double prev_x;
+
+  // First handle the lower endpoints.
+  // We need to advance till they're the same because we should take just the
+  // one with the lower start until they are both valid
+  if (has_endpoints) {
+    if (*x1 == *x2) {
+      prev_x = *(x1++);
+      ++x2;
+      xc.push_back(prev_x);
+    } else {
+      bool start_with_1 = (*x1 < *x2);
+      auto &xa = start_with_1 ? x1 : x2, &xb = start_with_1 ? x2 : x1;
+      auto& Ca = start_with_1 ? C1 : C2;
+      auto& xca = start_with_1 ? xc1 : xc2;
+
+      xc.push_back(*(xa++));  // new lower bound
+      while (*xa < *xb) {
+        C.push_back(Ca.row(std::distance(xca.begin(), xa) - 1));
+        xc.push_back(*(xa++));
+      }
+      C.push_back(Ca.row(std::distance(xca.begin(), xa) - 1));
+      prev_x = *(xb++);
+      xc.push_back(prev_x);
+    }
+  } else {
+    prev_x = -std::numeric_limits<double>::infinity();
+  }
+
+  // Next handle the middle
+  while ((x1 != xc1.end()) && (x2 != xc2.end())) {
+    if (*x1 > *x2) {
+      insertMinInRegion(prev_x, *x2,  //
+                        std::distance(xc1.begin(), x1) - 1,
+                        std::distance(xc2.begin(), x2) - 1,  //
+                        xc, C);
+      prev_x = *(x2++);
+    } else if (std::abs(*x1 - *x2) < 1e-9) {  // advance both
+      insertMinInRegion(prev_x, *x1,          //
+                        std::distance(xc1.begin(), x1) - 1,
+                        std::distance(xc2.begin(), x2) - 1,  //
+                        xc, C);
+      prev_x = *(x1++);
+      ++x2;
+    } else {
+      insertMinInRegion(prev_x, *x1,  //
+                        std::distance(xc1.begin(), x1) - 1,
+                        std::distance(xc2.begin(), x2) - 1,  //
+                        xc, C);
+      prev_x = *(x1++);
+    }
+  }
+  // Finally, handle the leftovers
+  if (!has_endpoints) {
+    while (x1 != xc1.end()) {
+      assertm(x2 == xc2.end(),
+              "Only one of (x1 and x2) should have extra elements");
+      insertMinInRegion(prev_x, *x1,  //
+                        std::distance(xc1.begin(), x1) - 1,
+                        std::distance(xc2.begin(), x2) - 1,  //
+                        xc, C);
+      prev_x = *(x1++);
+    }
+    while (x2 != xc2.end()) {
+      insertMinInRegion(prev_x, *x2,  //
+                        std::distance(xc1.begin(), x1) - 1,
+                        std::distance(xc2.begin(), x2) - 1,  //
+                        xc, C);
+      prev_x = *(x2++);
+    }
+    insertMinInRegion(prev_x, std::numeric_limits<double>::infinity(),  //
+                      std::distance(xc1.begin(), x1) - 1,
+                      std::distance(xc2.begin(), x2) - 1,  //
+                      xc, C);
+    xc.erase(xc.end() - 1);  // remove the extra infinity at the end
+  } else {
+    bool end_with_1 = (x2 == xc2.end());
+    assertm(end_with_1 || (x1 == xc1.end()),
+            "Only one of (x1 and x2) should have extra elements");
+    auto& x_ = end_with_1 ? x1 : x2;
+    auto& C_ = end_with_1 ? C1 : C2;
+    auto& xc_ = end_with_1 ? xc1 : xc2;
+
+    while (x_ != xc_.end()) {
+      C.push_back(C_.row(std::distance(xc_.begin(), x_) - 1));
+      xc.push_back(*(x_++));
+    }
+  }
+
+  // Export C and xc
+  SmoothenInPlace(C, xc);
+  q1.C.resize(C.size(), 3);
+  q1.xc.resize(xc.size());
+  std::copy(C.begin(), C.end(), q1.C.rowwise().begin());
+  std::copy(xc.begin(), xc.end(), q1.xc.begin());
+}
+
+/******************************************************************************/
+
+void PiecewiseQuadratic1d::SmoothenInPlace(
+    std::vector<Eigen::Matrix<double, 1, 3>>& C, std::vector<double>& xc) {
+  // TODO(gerry): implement
+  return;
+}
+
+/******************************************************************************/
+
+void PiecewiseQuadratic1d::SmoothenInPlace(PiecewiseQuadratic1d& q) {
+  // TODO(gerry): implement
   return;
 }
 
@@ -109,8 +302,9 @@ Eigen::Matrix<double, 1, 3> substitute(
 }  // namespace internal
 
 /******************************************************************************/
-// Calculates the number of segments in the piecewise quadratic result based on
-// the number of intersections of the conditional and the piecewise segments.
+// Calculates the number of segments in the piecewise quadratic result based
+// on the number of intersections of the conditional and the piecewise
+// segments.
 int computeNumSegments(const Vec& xc, const PiecewiseLinear& conditional) {
   int count = 0;
   const auto& m = conditional.m;

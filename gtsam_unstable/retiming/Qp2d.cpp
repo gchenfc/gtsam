@@ -69,6 +69,15 @@ PiecewiseQuadratic1d min(const PiecewiseQuadratic& objective,
     x_min = x_max;
   }
 
+  // Finally, we need to switch from the convention of including limits in xc to
+  // without
+  if (bounds_on_argument) {
+    *bounds_on_argument << 1, sol.xc(sol.xc.size() - 1),  //
+        -1, -sol.xc(0);
+  }
+  Eigen::VectorXd xc_tmp = sol.xc.segment(1, sol.xc.size() - 2);
+  sol.xc = xc_tmp;
+
   return sol;
 }
 
@@ -119,10 +128,14 @@ void computeObjectiveAlongBoundary(const Inequalities& inequalities,
     //                        x = m.y + b
     if (std::abs(A(i)) < 1e-9) continue;  // horizontal line
     double m_ = -B(i) / A(i), b_ = C(i) / A(i);
+    auto next_vertex =
+        lp2d::nextVertexFromSorted(inequalities, i, ccw == to_max)(1);
+    printf("next vertex: %f, last vertex: %f\n", next_vertex, xc.back());
+    if (next_vertex == xc.back()) continue;
     qs.emplace_back(::gtsam::internal::substitute(objective, m_, b_));
-    xc.emplace_back(
-        lp2d::nextVertexFromSorted(inequalities, i, ccw == to_max)(1));
+    xc.emplace_back(next_vertex);
   }
+
   // Add objective for final
   double m_ = -B(end_edge) / A(end_edge), b_ = C(end_edge) / A(end_edge);
   qs.emplace_back(::gtsam::internal::substitute(objective, m_, b_));
@@ -133,6 +146,12 @@ void computeObjectiveAlongBoundary(const Inequalities& inequalities,
         lp2d::nextVertexFromSorted(inequalities, end_edge, ccw == to_max)(1));
   } else {
     xc.emplace_back(y_at_intersection);
+  }
+
+  // Check if the last 2 are redundant
+  if ((xc.size() >= 2) && (xc.back() == xc.at(xc.size() - 2))) {
+    xc.pop_back();
+    qs.pop_back();
   }
 }
 
@@ -171,16 +190,24 @@ PiecewiseQuadratic1d min(const Eigen::Ref<const Quadratic>& objective,
   for (int i = 0; i < is_feasibles.size(); ++i) {
     if (is_feasibles(i)) {
       if (B(i) > 0) {  // upper bound
-        assertm(upper_intersection == -1, "Multiple upper intersections");
+        if (upper_intersection != -1) {
+          if ((xs(i) != xs(upper_intersection)) ||
+              (ys(i) != ys(upper_intersection))) {
+            assertm(false, "Multiple distinct upper intersections");
+          }
+        }
         upper_intersection = i;
       } else {
-        assertm(lower_intersection == -1, "Multiple lower intersections");
+        if (lower_intersection != -1) {
+          if ((xs(i) != xs(lower_intersection)) ||
+              (ys(i) != ys(lower_intersection))) {
+            assertm(false, "Multiple distinct lower intersections");
+          }
+        }
         lower_intersection = i;
       }
     }
   }
-  printf("lower_intersection = %d, upper_intersection = %d\n",
-         lower_intersection, upper_intersection);
 
   // First traverse until the lower bound
   if (lower_intersection == -1) {
@@ -189,7 +216,8 @@ PiecewiseQuadratic1d min(const Eigen::Ref<const Quadratic>& objective,
   } else {
     // Traverse from min to intersection
     computeObjectiveAlongBoundary(inequalities, objective, lower_intersection,
-                                  /*to_max*/ false, ys(lower_intersection),  //
+                                  /*to_max*/ false,
+                                  ys(lower_intersection),  //
                                   qs, xc);
   }
 

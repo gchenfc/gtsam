@@ -88,8 +88,6 @@ TEST(Qp2d, min_single_quadratic) {
 
 /* ************************************************************************* */
 TEST(Qp2d, solve_parametric) {
-  CHECK(false);  // Temporarily disable this before I've implemented minInPlace
-
   // See Qp2d_example.ipynb
   // z1: [0.5, 3, 0, 0.5, -0.6, 0.155]
   // z2: [0.8, 1, -1.2, 0, 0, 0]
@@ -121,20 +119,22 @@ TEST(Qp2d, solve_parametric) {
                                  .finished();
   EXPECT(assert_equal(expected_bounds, actual_bounds, 1e-9));
 
-  // Construct the expected x^*(y) piecewise linear solution.
-  double xc2 = 0.0700194588625913, xc3 = 0.17487850032108213;
-  Eigen::Matrix<double, 5, 3> expected_m_b_yc;
-  expected_m_b_yc << 0, 0, 0,  // x = 0, for y < 0
-      0.75, 0, xc2,            // x = 0.75 * y, for 0 <= y <= xc2
-      0, -0.5, xc3,            // x = -0.5, for xc2 < y <= xc3
-      0.75, 0, 6.0 / 7.0,      // x = 0.75 * y, for xc3 < y <= 6/7
-      -1, 1.5, 999999999;      // x = 1.5 - y, for y > 6/7
-  PiecewiseLinear expected_conditional{expected_m_b_yc.col(0),
-                                       expected_m_b_yc.col(1),
-                                       expected_m_b_yc.col(2).head<4>()};
-  // Substitute x^*(y) into the objective function to obtain the propagated
-  // objective function
-  auto expected_objective = q.substitute(expected_conditional);
+  // Objectives are:
+  //    1 * y^2 + 0 * y + 0,      for -1 < y < 0
+  //    0.55 * y^2 + 0 * y + 0,   for 0 <= y <= 0.0700194588625913
+  //    3 * y^2 - 0.6 * y + 0.03, for 0.07001945886259 <= y <= 0.174878500321082
+  //    0.55 * y^2 + 0 * y + 0,   for 0.17487850032108213 <= y <= 6/7
+  //    3 * y^2 - 4.2 * y + 1.8,  for 6/7 < y <= 1
+  // Note that we for this function, we explicitly return the -1, +1 bounds
+  PiecewiseQuadratic1d expected_objective{
+      .C = (Matrix(5, 3) << 1, 0, 0,  //
+            0.55, 0, 0,               //
+            3, -0.6, 0.03,            //
+            0.55, 0, 0,               //
+            3, -4.2, 1.8)
+               .finished(),
+      .xc = (Vector(4) << 0, 0.0700194588625913, 0.17487850032108213, 6.0 / 7.0)
+                .finished()};
 
   // Compare to the expected objective function
   EXPECT(assert_equal(expected_objective, actual_objective, 1e-9));

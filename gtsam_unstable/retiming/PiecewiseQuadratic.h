@@ -42,6 +42,13 @@ struct PiecewiseQuadratic1d {
   static void MinInPlace(PiecewiseQuadratic1d& q1,
                          const PiecewiseQuadratic1d& q2);
 
+  /// @brief Eliminates unnecessary xc's by merging identical adjacent segments
+  static void SmoothenInPlace(PiecewiseQuadratic1d& q);
+
+  /// @brief Eliminates unnecessary xc's by merging identical adjacent segments
+  static void SmoothenInPlace(std::vector<Eigen::Matrix<double, 1, 3>>& C,
+                              std::vector<double>& xc);
+
   /// @brief Evaluate the piecewise quadratic at a point x
   double evaluate(double x) {
     auto i =

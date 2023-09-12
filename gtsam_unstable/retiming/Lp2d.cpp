@@ -66,8 +66,8 @@ ScalarBounds extremalsY(const Inequalities& inequalities) {
 
 /******************************************************************************/
 
-int findCcwIntersection(const Inequalities& inequalities, int start_index,
-                        bool ccw = true) {
+int findCcwIntersection(const Eigen::Ref<const Inequalities>& inequalities,
+                        int start_index, bool ccw = true) {
   // Find the first inequality that is ccw with the point
   for (int i = 0; i < inequalities.rows(); ++i) {
     if (i == start_index) continue;
@@ -125,7 +125,7 @@ bool sortBoundaries(const Inequalities& inequalities, Inequalities& result) {
   if (start_index == inequalities.rows()) return false;  // infeasible
 
   // Now loop over the rest of the edges
-  for (int index = start_index + 1; index < inequalities.rows(); ++index) {
+  for (int index = 1; index < inequalities.rows(); ++index) {
     most_recent_added = findCcwIntersection(inequalities, most_recent_added);
     if (most_recent_added == -1) {
       // The feasible region is open, so we need to go cw starting from
