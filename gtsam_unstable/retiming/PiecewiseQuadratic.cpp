@@ -1,6 +1,7 @@
 #include "PiecewiseQuadratic.h"
 
 #include "RetimingObjective.h"
+#include "Qp2d.h"
 
 namespace gtsam {
 
@@ -281,7 +282,9 @@ double PiecewiseQuadratic::evaluate(double x, double y) const {
 
 std::pair<PiecewiseQuadratic, Bounds1d> PiecewiseQuadratic::solveParametric(
     const Inequalities& inequalities) const {
-  return {PiecewiseQuadratic(), Bounds1d()};
+  Bounds1d bounds;
+  auto sol = qp2d::min(*this, inequalities, &bounds);
+  return {sol, bounds};
 }
 
 /******************************************************************************/
@@ -364,8 +367,16 @@ void PiecewiseQuadratic::iterateOverXcYcSegments(
     // x = my + b, so y = (x - b) / m
     auto intersect = [&m_ = m(y_segment_index), &b_ = b(y_segment_index)](
                          double x) { return (x - b_) / m_; };
+    if (std::abs(m(y_segment_index)) < 1e-9) {
+      auto it = std::upper_bound(xc.begin(), xc.end(), x1);
+      func(std::distance(xc.begin(), it), y_segment_index,
+           (y_segment_index == yc.size())
+               ? std::numeric_limits<double>::infinity()
+               : yc(y_segment_index));
+      return;
+    }
     if (x1 < x2) {  // left-to-right
-      auto it = std::lower_bound(xc.begin(), xc.end(), x1);
+      auto it = std::upper_bound(xc.begin(), xc.end(), x1);
       for (; (it != xc.end()) && (*it < x2); ++it) {
         func(std::distance(xc.begin(), it), y_segment_index, intersect(*it));
       }
@@ -375,7 +386,7 @@ void PiecewiseQuadratic::iterateOverXcYcSegments(
                ? std::numeric_limits<double>::infinity()
                : yc(y_segment_index));
     } else {  // right-to-left
-      auto it_right = std::upper_bound(xc.begin(), xc.end(), x1);
+      auto it_right = std::lower_bound(xc.begin(), xc.end(), x1);
       auto it_left = it_right - 1;
       for (; (std::distance(xc.begin(), it_left) >= 0) && (*it_left > x2);
            --it_left, --it_right) {
@@ -404,7 +415,7 @@ void PiecewiseQuadratic::iterateOverXcYcSegments(
   // Loop through each yc segment
   for (int i = 0; i < yc.size(); ++i) {
     // The x value at the end of the yc segment
-    double segment_x_start = m(i) * prev_y + b(i);
+    double segment_x_start = (m(i) == 0) ? b(i) : (m(i) * prev_y + b(i));
     double segment_x_end = m(i) * yc(i) + b(i);
     doYRegion(i, segment_x_start, segment_x_end);
     prev_y = yc(i);

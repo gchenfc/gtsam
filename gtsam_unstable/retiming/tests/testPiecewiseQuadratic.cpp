@@ -182,18 +182,27 @@ TEST(PiecewiseQuadratic, solve_parametric) {
 
   // Construct the expected x^*(y) piecewise linear solution.
   double xc2 = 0.0700194588625913, xc3 = 0.17487850032108213;
-  Eigen::Matrix<double, 4, 3> expected_m_b_yc;
-  expected_m_b_yc << 0, 0, 0,  // x = 0, for y < 0
-      0.75, 0, xc2,            // x = 0.75 * y, for 0 <= y <= xc2
-      0, -0.5, xc3,            // x = -0.5, for xc2 < y <= xc3
-      0.75, 0, 6.0 / 7.0,      // x = 0.75 * y, for xc3 < y <= 6/7
-      -1, 1.5, 999999999;      // x = 1.5 - y, for y > 6/7
+  Eigen::Matrix<double, 5, 3> expected_m_b_yc;
+  expected_m_b_yc << 0, 1e-10, 0,  // x = 0, for y < 0
+      0.75, 0, xc2,                // x = 0.75 * y, for 0 <= y <= xc2
+      0, -0.5, xc3,                // x = -0.5, for xc2 < y <= xc3
+      0.75, 0, 6.0 / 7.0,          // x = 0.75 * y, for xc3 < y <= 6/7
+      -1, 1.5, 999999999;          // x = 1.5 - y, for y > 6/7
   PiecewiseLinear expected_conditional{.m = expected_m_b_yc.col(0),
                                        .b = expected_m_b_yc.col(1),
                                        .xc = expected_m_b_yc.col(2).head<4>()};
+
   // Substitute x^*(y) into the objective function to obtain the propagated
   // objective function
-  PiecewiseQuadratic expected_objective = q.substitute(expected_conditional);
+  PiecewiseQuadratic expected_objective_ = q.substitute(expected_conditional);
+
+  // Need to manually apply the bounds
+  const auto& yc = expected_objective_.xc();
+  int l = std::distance(yc.begin(), std::upper_bound(yc.begin(), yc.end(), -1));
+  int u = std::distance(yc.begin(), std::lower_bound(yc.begin(), yc.end(), 1));
+  PiecewiseQuadratic expected_objective(
+      expected_objective_.C().block(l, 0, u - l + 1, 6),
+      expected_objective_.xc().segment(l, u - l));
 
   // Compare to the expected objective function
   EXPECT(assert_equal(expected_objective, actual_objective, 1e-9));
