@@ -233,6 +233,34 @@ TEST(Lp2d, sorted_inequalities_open_boundary2) {
 }
 
 /* ************************************************************************* */
+TEST(Lp2d, traverse_to_extremal) {
+  Inequalities inequalities(7, 3);
+  inequalities << -1, 1, 0.5,  // y <= x + 0.5
+      1. / 3, -1, 0,           // y >= x/3
+      -1, -1, -0.5,            // y >= 0.5 - x
+      1, 1, 1,                 // y <= 1 - x
+      1, 0, 0.5,               // x <= 0.5
+      -1, 0, 100,              // x >= -100
+      0, -1, 100;              // y >= -100
+  // Sort
+  Inequalities sorted(5, 3);
+  sorted << inequalities.row(0), inequalities.row(2), inequalities.row(1),
+      inequalities.row(4), inequalities.row(3);
+
+  //                                                   start, ccw
+  EXPECT_LONGS_EQUAL(1, traverseSortedToExtremal(sorted, 0, true));
+  EXPECT_LONGS_EQUAL(1, traverseSortedToExtremal(sorted, 1, true));
+  EXPECT_LONGS_EQUAL(4, traverseSortedToExtremal(sorted, 2, true));
+  EXPECT_LONGS_EQUAL(4, traverseSortedToExtremal(sorted, 3, true));
+  EXPECT_LONGS_EQUAL(4, traverseSortedToExtremal(sorted, 4, true));
+  EXPECT_LONGS_EQUAL(0, traverseSortedToExtremal(sorted, 0, false));
+  EXPECT_LONGS_EQUAL(0, traverseSortedToExtremal(sorted, 1, false));
+  EXPECT_LONGS_EQUAL(2, traverseSortedToExtremal(sorted, 2, false));
+  EXPECT_LONGS_EQUAL(2, traverseSortedToExtremal(sorted, 3, false));
+  EXPECT_LONGS_EQUAL(2, traverseSortedToExtremal(sorted, 4, false));
+}
+
+/* ************************************************************************* */
 int main() {
   TestResult tr;
   return TestRegistry::runAllTests(tr);

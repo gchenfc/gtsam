@@ -66,11 +66,6 @@ ScalarBounds extremalsY(const Inequalities& inequalities) {
 
 /******************************************************************************/
 
-bool isCcw(const Inequality& line1, const Inequality& line2) {
-  // Check if the inequalities are going ccw or cw.  Return true for ccw
-  return (line1(0) * line2(1) - line1(1) * line2(0)) > 0;
-};
-
 int findCcwIntersection(const Inequalities& inequalities, int start_index,
                         bool ccw = true) {
   // Find the first inequality that is ccw with the point
@@ -111,6 +106,11 @@ void sortInequalitiesCw(const Inequalities& inequalities, int start_index,
 }
 
 bool sortBoundaries(const Inequalities& inequalities, Inequalities& result) {
+  if (inequalities.rows() <= 2) {
+    result = inequalities;
+    return true;
+  }
+
   result.resize(inequalities.rows(), 3);
   // Handle first pair of edges separately
   int start_index = 0, most_recent_added;
@@ -162,6 +162,35 @@ bool insertBoundariesSorted(const Inequalities& inequalities,
   tmp << inequalities, new_inequalities;
   return sortBoundaries(tmp, result);
 }
+
+/******************************************************************************/
+
+int traverseSortedToExtremal(const Inequalities& inequalities, int start_index,
+                             bool ccw) {
+  if (inequalities.rows() == 1) return 0;
+
+  const auto& outside_dir = inequalities.col(0);
+  bool is_left = outside_dir(start_index) < 0;
+
+  int min_edge;
+  int next_edge = start_index;
+  do {
+    min_edge = next_edge;
+    next_edge = (ccw ? (min_edge + 1) : (min_edge + inequalities.rows() - 1)) %
+                inequalities.rows();
+  } while (
+      ((outside_dir(next_edge) < 0) == is_left) &&
+      (isCcw(inequalities.row(min_edge), inequalities.row(next_edge)) == ccw));
+
+  return min_edge;
+}
+
+/******************************************************************************/
+
+bool isCcw(const Inequality& line1, const Inequality& line2) {
+  // Check if the inequalities are going ccw or cw.  Return true for ccw
+  return (line1(0) * line2(1) - line1(1) * line2(0)) > 0;
+};
 
 /******************************************************************************/
 

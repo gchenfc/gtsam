@@ -51,6 +51,16 @@ bool insertBoundariesSorted(const Inequalities& inequalities,
                             const Inequalities& new_inequalities,
                             Inequalities& result);
 
+/// @brief Traverse the inequalities in counterclockwise order starting from
+/// start_index
+/// @returns The index of the "extremal" inequality (the last inequality before
+/// the extremal)
+int traverseSortedToExtremal(const Inequalities& inequalities, int start_index,
+                             bool ccw);
+
+/// @brief Check if the inequalities are sorted in counterclockwise order
+bool isCcw(const Inequality& line1, const Inequality& line2);
+
 /// @brief Compute the intersection of 2 lines
 Point intersection(const Inequality& line1, const Inequality& line2,
                    double parallel_tol = 1e-12);

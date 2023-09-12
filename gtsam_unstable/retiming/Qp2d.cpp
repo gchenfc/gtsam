@@ -75,18 +75,30 @@ PiecewiseQuadratic1d min(const Eigen::Ref<const Quadratic>& objective,
   const auto& ys = (C - A * b) / (A * m + B);
   const auto& xs = m * ys + b;
   const auto& is_feasibles = (A * xs + B * ys) <= (C + 1e-9);
-  lp2d::Point lower_intersection, upper_intersection;
+  int lower_intersection = -1, upper_intersection = -1;
   for (int i = 0; i < is_feasibles.size(); ++i) {
     if (is_feasibles(i)) {
       if (B(i) > 0) {  // upper bound
-        upper_intersection << xs(i), ys(i);
+        assertm(upper_intersection == -1, "Multiple upper intersections");
+        upper_intersection = i;
       } else {
-        lower_intersection << xs(i), ys(i);
+        assertm(lower_intersection == -1, "Multiple lower intersections");
+        lower_intersection = i;
       }
     }
   }
 
   // First traverse until the lower bound
+  if (lower_intersection == -1) {
+    // No lower bound, so we start at -infinity
+    // qs.emplace_back(objective);
+    // xc.emplace_back(-std::numeric_limits<double>::infinity());
+  } else {
+    // find the final edge (min edge)
+    
+    // qs.emplace_back(objective);
+    // xc.emplace_back(xs(lower_intersection));
+  }
 
   // Middle is the unconstrained solution
 
