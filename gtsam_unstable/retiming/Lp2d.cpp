@@ -80,6 +80,44 @@ int findCcwIntersection(const Eigen::Ref<const Inequalities>& inequalities,
   return -1;
 }
 
+// This is a special case of sortBoundaries when there are no intersections
+bool sortInequalitiesNoIntersections(const Inequalities& inequalities,
+                                     Inequalities& result) {
+  // This can happen if either there are no feasible intersections, or there
+  // are no intersections to begin with (all are parallel)
+  // Let's check if they're all parallel
+  for (int i = 1; i < inequalities.rows(); ++i) {
+    if (abs(inequalities(i, 0) * inequalities(0, 1) -
+            inequalities(i, 1) * inequalities(0, 0)) > 1e-12) {
+      // these are not parallel, so must be infeasible
+      return false;  // infeasible
+    }
+  }
+  // Now we know they are all parallel, but they could be pointing outwards,
+  // e.g. x > 1, and x < -1
+  // For each line, find a random point on it and check if it's infeasible
+  result = Inequalities(2, 3);
+  int num_feasible = 0;
+  if (std::abs(inequalities(0, 0)) > 1e-8) {  // try y = 0
+    for (int i = 0; i < inequalities.rows(); ++i) {
+      if (isFeasible(inequalities,
+                     Point(inequalities(i, 2) / inequalities(i, 0), 0))) {
+        result.row(num_feasible++) = inequalities.row(i);
+      }
+    }
+  } else {  // do x = 0
+    for (int i = 0; i < inequalities.rows(); ++i) {
+      if (isFeasible(inequalities,
+                     Point(0, inequalities(i, 2) / inequalities(i, 1)))) {
+        result.row(num_feasible++) = inequalities.row(i);
+      }
+    }
+  }
+  if (num_feasible == 0) return false;
+  result.conservativeResize(num_feasible, Eigen::NoChange);
+  return true;
+}
+
 void sortInequalitiesCw(const Inequalities& inequalities, int start_index,
                         int end_index, Inequalities& output) {
   // Search clockwise starting from start_index, and stop if we ever hit
@@ -122,7 +160,9 @@ bool sortBoundaries(const Inequalities& inequalities, Inequalities& result) {
       break;
     }
   }
-  if (start_index == inequalities.rows()) return false;  // infeasible
+  if (start_index == inequalities.rows()) {
+    return sortInequalitiesNoIntersections(inequalities, result);
+  }
 
   // Now loop over the rest of the edges
   for (int index = 1; index < inequalities.rows(); ++index) {
@@ -157,6 +197,10 @@ bool sortBoundaries(const Inequalities& inequalities, Inequalities& result) {
 bool insertBoundariesSorted(const Inequalities& inequalities,
                             const Inequalities& new_inequalities,
                             Inequalities& result) {
+  if (new_inequalities.rows() == 0) {
+    result = inequalities;
+    return true;
+  }
   // TODO(gerry): implement this more efficiently
   Inequalities tmp(inequalities.rows() + new_inequalities.rows(), 3);
   tmp << inequalities, new_inequalities;

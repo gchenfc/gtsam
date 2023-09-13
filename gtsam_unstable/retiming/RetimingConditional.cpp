@@ -89,7 +89,7 @@ double solveInequalityQuadratic(
       if (row(0) == 1) {
         xmax = std::min(xmax, row(1));
       } else if (row(0) == -1) {
-        xmin = std::max(xmin, row(1));
+        xmin = std::max(xmin, -row(1));
       } else {
         throw std::runtime_error("Inequality should be 1 or -1");
       }

@@ -39,10 +39,15 @@ PiecewiseQuadratic1d min(const PiecewiseQuadratic& objective,
   auto insert_x_lims = [&inequalities_sorted, &x_bounds,
                         &ineqs_with_x_limits_sorted](double x_min,
                                                      double x_max) -> bool {
-    x_bounds << 1, 0, x_max,  //
-        -1, 0, -x_min;
-    return lp2d::insertBoundariesSorted(inequalities_sorted, x_bounds,
-                                        ineqs_with_x_limits_sorted);
+    int num = 0;
+    if (x_max != std::numeric_limits<double>::infinity()) {
+      x_bounds.row(num++) << 1, 0, x_max;
+    }
+    if (x_min != -std::numeric_limits<double>::infinity()) {
+      x_bounds.row(num++) << -1, 0, -x_min;
+    }
+    return lp2d::insertBoundariesSorted(
+        inequalities_sorted, x_bounds.topRows(num), ineqs_with_x_limits_sorted);
   };
 
   // We build-it out by starting with some solution then merging in one at a
@@ -67,6 +72,14 @@ PiecewiseQuadratic1d min(const PiecewiseQuadratic& objective,
     const auto& sol2 = min(objective.C().row(i), ineqs_with_x_limits_sorted);
     PiecewiseQuadratic1d::MinInPlace(sol, sol2);
     x_min = x_max;
+  }
+  if ((sol.xc.size() == 0) && (sol.C.size() == 0)) {
+    objective.print("Encountered infeasible problem!  Called with objective:");
+    std::cout << "Inequalities:\n"
+              << WithIndent(inequalities, "\t") << std::endl;
+    std::cout << "Sorted Inequalities is:\n"
+              << WithIndent(inequalities_sorted, "\t") << std::endl;
+    throw std::runtime_error("Encountered Infeasible Problem");
   }
 
   // Finally, we need to switch from the convention of including limits in xc to

@@ -230,7 +230,7 @@ void PiecewiseQuadratic1d::MinInPlace(PiecewiseQuadratic1d& q1,
       auto& xca = start_with_1 ? xc1 : xc2;
 
       xc.push_back(*(xa++));  // new lower bound
-      while (*xa < *xb) {
+      while ((*xa < *xb) && (xa != xca.end())) {
         C.push_back(Ca.row(std::distance(xca.begin(), xa) - 1));
         xc.push_back(*(xa++));
       }

@@ -187,7 +187,7 @@ struct WithIndent {
   const std::string& indent;
   int width;
   WithIndent(const MatrixType& mat, const std::string& indent = "\t",
-             int width = 8)
+             int width = 10)
       : mat(mat), indent(indent), width(width) {}
 
   friend std::ostream& operator<<(std::ostream& os, const WithIndent& obj) {
