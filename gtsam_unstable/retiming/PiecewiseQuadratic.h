@@ -210,6 +210,11 @@ class PiecewiseQuadratic {
   PiecewiseQuadratic rekey(const KeyVector& src_keys,
                            const KeyVector& dest_keys) const;
 
+  /// Returns true if the piecewise quadratic is useless (all zeros)
+  bool empty() const {
+    return (C_.array() == 0).all() && (xc_.array() == 0).all();
+  }
+
   // Testable
   void print(const std::string& s = "Piecewise Quadratic",
              const KeyFormatter& formatter = DefaultKeyFormatter) const {

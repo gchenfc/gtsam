@@ -64,6 +64,11 @@ RetimingObjectives substitute(const RetimingObjectives& objectives,
                               : RetimingObjective(
                                     objective.quadratic.substitute(equality));
                  });
+  auto it = std::remove_if(
+      result.begin(), result.end(), [](const RetimingObjective& objective) {
+        return objective.isGreedy || objective.quadratic.empty();
+      });
+  result.erase(it, result.end());
   return result;
 }
 
