@@ -191,6 +191,10 @@ class PiecewiseQuadratic {
   /// @brief Solve argmin, given y
   double argmin(double y) const { return substitute(y).argmin(); }
 
+  /// @brief Eliminates unnecessary xc's by merging identical adjacent segments
+  static void SmoothenInPlace(std::vector<Eigen::Matrix<double, 1, 6>>& C,
+                              std::vector<double>& xc);
+
   /// Applies `func` to each of the segments where we have a distinct region
   /// between the quadratic (piecewise over x) and conditional (linear piecewise
   /// over y) regions.

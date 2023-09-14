@@ -1,5 +1,6 @@
 #include "PiecewiseQuadratic.h"
 
+#include "removeRepeats.h"
 #include "RetimingObjective.h"
 #include "Qp2d.h"
 
@@ -314,22 +315,80 @@ void PiecewiseQuadratic1d::MinInPlace(PiecewiseQuadratic1d& q1,
 
 void PiecewiseQuadratic1d::SmoothenInPlace(
     std::vector<Eigen::Matrix<double, 1, 3>>& C, std::vector<double>& xc) {
-  int offset = (xc.size() > C.size()) ? 0 : 1;
-  for (int i = 0; i < xc.size() - 2 + offset; ++i) {
-    if ((xc.at(i + offset) == xc.at(i + 1 + offset)) ||
-        (C.at(i) == C.at(i + 1))) {
-      // delete this row
-      C.erase(C.begin() + i + offset);
-      xc.erase(xc.begin() + i + 1);
-    }
+  std::cout << "Calling smooth in place with " << xc.size() << std::endl;
+
+  const auto custom_equals_xc = [](double x1, double x2) {
+    return std::abs(x1 - x2) < 1e-9;
+  };
+  const auto custom_equals_C = [](const Eigen::Matrix<double, 1, 3>& C1,
+                                  const Eigen::Matrix<double, 1, 3>& C2) {
+    return ((C1 - C2).array().abs() < 1e-9).all();
+  };
+
+  if (xc.size() > C.size()) {
+    auto [xc_end, C_end] =
+        removeRepeats(xc.begin(), xc.end(), C.begin(), C.end(),
+                      custom_equals_xc, custom_equals_C);
+    xc.erase(xc_end, xc.end());
+    C.erase(C_end, C.end());
+  } else {
+    auto [C_end, xc_end] =
+        removeRepeats(C.begin(), C.end(), xc.begin(), xc.end(), custom_equals_C,
+                      custom_equals_xc);
+    xc.erase(xc_end, xc.end());
+    C.erase(C_end, C.end());
   }
-  return;
+
+  std::cout << "Smooth in place returned with " << xc.size() << std::endl;
+}
+
+/******************************************************************************/
+
+void PiecewiseQuadratic::SmoothenInPlace(
+    std::vector<Eigen::Matrix<double, 1, 6>>& C, std::vector<double>& xc) {
+  std::cout << "Calling smooth in place with " << xc.size() << std::endl;
+
+  const auto custom_equals_xc = [](double x1, double x2) {
+    return std::abs(x1 - x2) < 1e-9;
+  };
+  const auto custom_equals_C = [](const Eigen::Matrix<double, 1, 6>& C1,
+                                  const Eigen::Matrix<double, 1, 6>& C2) {
+    return ((C1 - C2).array().abs() < 1e-9).all();
+  };
+
+  if (xc.size() > C.size()) {
+    auto [xc_end, C_end] =
+        removeRepeats(xc.begin(), xc.end(), C.begin(), C.end(),
+                      custom_equals_xc, custom_equals_C);
+    xc.erase(xc_end, xc.end());
+    C.erase(C_end, C.end());
+  } else {
+    auto [C_end, xc_end] =
+        removeRepeats(C.begin(), C.end(), xc.begin(), xc.end(), custom_equals_C,
+                      custom_equals_xc);
+    xc.erase(xc_end, xc.end());
+    C.erase(C_end, C.end());
+  }
+
+  std::cout << "Smooth in place returned with " << xc.size() << std::endl;
 }
 
 /******************************************************************************/
 
 void PiecewiseQuadratic1d::SmoothenInPlace(PiecewiseQuadratic1d& q) {
-  throw std::runtime_error("Not implemented");
+  auto C = q.C.rowwise();
+  auto xc = q.xc.rowwise();
+  if (q.xc.rows() > q.C.rows()) {
+    auto [xc_end, C_end] =
+        removeRepeats(xc.begin(), xc.end(), C.begin(), C.end());
+    q.xc.conservativeResize(std::distance(xc.begin(), xc_end));
+    q.C.conservativeResize(std::distance(C.begin(), C_end), Eigen::NoChange);
+  } else {
+    auto [C_end, xc_end] =
+        removeRepeats(C.begin(), C.end(), xc.begin(), xc.end());
+    q.xc.conservativeResize(std::distance(xc.begin(), xc_end));
+    q.C.conservativeResize(std::distance(C.begin(), C_end), Eigen::NoChange);
+  }
 }
 
 /******************************************************************************/

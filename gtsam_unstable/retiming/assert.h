@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <stdexcept>
+
 namespace gtsam {
 
 // Use (void) to silence unused warnings.
