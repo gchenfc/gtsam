@@ -235,7 +235,11 @@ void PiecewiseQuadratic1d::MinInPlace(PiecewiseQuadratic1d& q1,
         C.push_back(Ca.row(std::distance(xca.begin(), xa) - 1));
         xc.push_back(*(xa++));
       }
-      C.push_back(Ca.row(std::distance(xca.begin(), xa) - 1));
+      if (xa == xca.end()) {
+        C.push_back({0, 0, std::numeric_limits<double>::infinity()});
+      } else {
+        C.push_back(Ca.row(std::distance(xca.begin(), xa) - 1));
+      }
       prev_x = *(xb++);
       xc.push_back(prev_x);
     }
@@ -266,6 +270,7 @@ void PiecewiseQuadratic1d::MinInPlace(PiecewiseQuadratic1d& q1,
       prev_x = *(x1++);
     }
   }
+
   // Finally, handle the leftovers
   if (!has_endpoints) {
     while (x1 != xc1.end()) {

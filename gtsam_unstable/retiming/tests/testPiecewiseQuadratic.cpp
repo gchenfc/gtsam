@@ -29,6 +29,7 @@ using namespace gtsam;
 
 using Vec = Eigen::Vector<double, Eigen::Dynamic>;
 using Inequalities = Eigen::Matrix<double, Eigen::Dynamic, 3>;
+using RowVec3 = Eigen::Matrix<double, 1, 3>;
 using Bounds1d = Eigen::Matrix<double, 2, 2>;
 
 /* ************************************************************************* */
@@ -58,6 +59,25 @@ TEST(PiecewiseQuadratic, evaluate2) {
   EXPECT_DOUBLES_EQUAL(613.87, q.evaluate(10.1, 4), 1e-9);
   EXPECT_DOUBLES_EQUAL(89.07, q.evaluate(10.9, -2), 1e-9);
   EXPECT_DOUBLES_EQUAL(2019.01, q.evaluate(11.1, 10.2), 1e-9);
+}
+
+/* ************************************************************************* */
+
+TEST(PiecewiseQuadratic1d, minInPlace) {
+  PiecewiseQuadratic1d q1 = PiecewiseQuadratic1d::Create(
+      {RowVec3(0, 0, 1.25), RowVec3(3, -6, 3.5)}, {0.5, 1.5, 2});
+  PiecewiseQuadratic1d q2 = PiecewiseQuadratic1d::Create(
+      {RowVec3(3, 6, 3.5), RowVec3(0, 0, 1.25)}, {-2, -1.5, -0.5});
+
+  double inf = std::numeric_limits<double>::infinity();
+  PiecewiseQuadratic1d expected = PiecewiseQuadratic1d::Create(
+      {RowVec3(3, 6, 3.5), RowVec3(0, 0, 1.25), RowVec3(0, 0, inf),
+       RowVec3(0, 0, 1.25), RowVec3(3, -6, 3.5)},
+      {-2, -1.5, -0.5, 0.5, 1.5, 2});
+
+  PiecewiseQuadratic1d::MinInPlace(q1, q2);
+
+  EXPECT(assert_equal(expected, q1, 1e-9));
 }
 
 /* ************************************************************************* */
@@ -230,7 +250,8 @@ TEST(PiecewiseQuadratic, solve) {
   EXPECT_DOUBLES_EQUAL(0.225, q.argmin(0.3), 1e-9);
   EXPECT_DOUBLES_EQUAL(0.6375, q.argmin(0.85), 1e-9);
   EXPECT_DOUBLES_EQUAL(0.645, q.argmin(0.86), 1e-9);  // no inequalities so stay
-  EXPECT_DOUBLES_EQUAL(0.7425, q.argmin(0.99), 1e-9);  // no inequalities so stay
+  EXPECT_DOUBLES_EQUAL(0.7425, q.argmin(0.99),
+                       1e-9);  // no inequalities so stay
 }
 
 /* ************************************************************************* */
