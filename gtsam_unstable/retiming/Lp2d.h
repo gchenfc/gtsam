@@ -71,7 +71,7 @@ Eigen::Array<double, Eigen::Dynamic, 2> computeAllIntersections(
 std::pair<int, int> computeFeasiblePointPair(
     const Inequalities& inequalities,
     const Eigen::Array<double, Eigen::Dynamic, 2>& intersections,
-    double tol = 1e-12);
+    const Inequality& line, double tol = 1e-12);
 
 /// @brief Check if the inequalities are sorted in counterclockwise order
 bool isCcw(const Inequality& line1, const Inequality& line2);

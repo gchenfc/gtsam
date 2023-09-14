@@ -163,6 +163,18 @@ inline Matrix dropCol(const Matrix& src, const int col) {
   return result;
 }
 
+/// Convert a 2x2 matrix representing scalar bounds to the form (min, max)
+inline std::pair<double, double> scalarBoundsToPair(
+    const Eigen::Matrix<double, 2, 2>& bounds) {
+  double min = -std::numeric_limits<double>::infinity();
+  double max = std::numeric_limits<double>::infinity();
+  for (const auto& row : bounds.rowwise()) {
+    if (row(0) == 1) max = std::min(max, row(1));
+    if (row(0) == -1) min = std::max(min, -row(1));
+  }
+  return {min, max};
+}
+
 // Print a single row (one linear constraint)
 inline void print(const Vector& row, const std::string& s = "",
                   const std::string& equalityString = "=",

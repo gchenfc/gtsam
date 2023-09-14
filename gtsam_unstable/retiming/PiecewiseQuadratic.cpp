@@ -277,21 +277,21 @@ void PiecewiseQuadratic1d::MinInPlace(PiecewiseQuadratic1d& q1,
       assertm(x2 == xc2.end(),
               "Only one of (x1 and x2) should have extra elements");
       insertMinInRegion(prev_x, *x1,  //
-                        std::distance(xc1.begin(), x1) - 1,
-                        std::distance(xc2.begin(), x2) - 1,  //
+                        std::distance(xc1.begin(), x1),
+                        std::distance(xc2.begin(), x2),  //
                         xc, C);
       prev_x = *(x1++);
     }
     while (x2 != xc2.end()) {
       insertMinInRegion(prev_x, *x2,  //
-                        std::distance(xc1.begin(), x1) - 1,
-                        std::distance(xc2.begin(), x2) - 1,  //
+                        std::distance(xc1.begin(), x1),
+                        std::distance(xc2.begin(), x2),  //
                         xc, C);
       prev_x = *(x2++);
     }
     insertMinInRegion(prev_x, std::numeric_limits<double>::infinity(),  //
-                      std::distance(xc1.begin(), x1) - 1,
-                      std::distance(xc2.begin(), x2) - 1,  //
+                      std::distance(xc1.begin(), x1),
+                      std::distance(xc2.begin(), x2),  //
                       xc, C);
     xc.erase(xc.end() - 1);  // remove the extra infinity at the end
   } else {
@@ -320,14 +320,16 @@ void PiecewiseQuadratic1d::MinInPlace(PiecewiseQuadratic1d& q1,
 
 void PiecewiseQuadratic1d::SmoothenInPlace(
     std::vector<Eigen::Matrix<double, 1, 3>>& C, std::vector<double>& xc) {
+#if PRINT_VERBOSITY > 20
   std::cout << "Calling smooth in place with " << xc.size() << std::endl;
+#endif
 
   const auto custom_equals_xc = [](double x1, double x2) {
-    return std::abs(x1 - x2) < 1e-9;
+    return std::abs(x1 - x2) < 1e-4;
   };
   const auto custom_equals_C = [](const Eigen::Matrix<double, 1, 3>& C1,
                                   const Eigen::Matrix<double, 1, 3>& C2) {
-    return ((C1 - C2).array().abs() < 1e-9).all();
+    return ((C1 - C2).array().abs() < 1e-4).all();
   };
 
   if (xc.size() > C.size()) {
@@ -344,7 +346,9 @@ void PiecewiseQuadratic1d::SmoothenInPlace(
     C.erase(C_end, C.end());
   }
 
+#if PRINT_VERBOSITY > 20
   std::cout << "Smooth in place returned with " << xc.size() << std::endl;
+#endif
 }
 
 /******************************************************************************/
@@ -612,16 +616,53 @@ PiecewiseQuadratic1d PiecewiseQuadratic::substitute(
 
 /******************************************************************************/
 
-PiecewiseQuadratic1d PiecewiseQuadratic::substitute(
+PiecewiseQuadratic PiecewiseQuadratic::substituteEq2(
     const LinearConstraint::Linear& conditional) const {
-  assertm(conditional.cols() == 3, "conditional must be 3-dimensional");
+  // a.x^2 + b.y^2 + c.x.y + d.x + e.y + f
+  // ~~~ i.x + j.y + kz = l
+  // x = j.y + k.z + l
+
+  double j = -conditional(1) / conditional(0);
+  double k = -conditional(2) / conditional(0);
+  double l = conditional(3) / conditional(0);
+
+  // a.y^2 + b.z^2 + c.y.z + d.y + e.z + f
+  // x^2 = j^2.y + k^2.z + l^2 + 2.j.l.y + 2.j.k.y.z + 2.l.k.z
+  Matrix16 coef_from_x2{j * j, k * k, 2 * j * k, 2 * j * l, 2 * k * l, l * l};
+  Matrix16 coef_from_xy{j, 0, k, l, 0, 0};
+  Matrix16 coef_from_x{0, 0, 0, j, k, l};
+  // Matrix16 coef_from_y2{1, 0, 0, 0, 0, 0};
+  // Matrix16 coef_from_y{0, 0, 0, 1, 0, 0};
+
+  const auto &a = C_.col(0), &b = C_.col(1), &c = C_.col(2), &d = C_.col(3),
+             &e = C_.col(4), &f = C_.col(5);
+
+  PiecewiseQuadratic result{
+      Eigen::Matrix<double, Eigen::Dynamic, 6>(C().rows(), 3), xc()};
+  result.C_ = a * coef_from_x2 + c * coef_from_xy + d * coef_from_x;
+  result.C_.col(0) += b;
+  result.C_.col(3) += e;
+  result.C_.col(5) += f;
+
+  if (result.C_.rows() > 1) {
+    throw std::runtime_error("Can't handle piecewise components with 3 vars");
+  }
+
+  return result;
+}
+
+/******************************************************************************/
+
+PiecewiseQuadratic1d PiecewiseQuadratic::substituteEq1(
+    const LinearConstraint::Linear& conditional) const {
   // a.x^2 + b.y^2 + c.x.y + d.x + e.y + f
   // i.x + j.y = k
   double m_ = -conditional(1) / conditional(0);
   double b_ = conditional(2) / conditional(0);
 
   PiecewiseQuadratic1d result{
-      Eigen::Matrix<double, Eigen::Dynamic, 3>(C_.rows(), 3), xc_};
+      Eigen::Matrix<double, Eigen::Dynamic, 3>(C_.rows(), 3),
+      Eigen::Matrix<double, Eigen::Dynamic, 1>(xc_.rows())};
 
   const auto &a = C_.col(0), &b = C_.col(1), &c = C_.col(2), &d = C_.col(3),
              &e = C_.col(4), &f = C_.col(5);
@@ -629,6 +670,11 @@ PiecewiseQuadratic1d PiecewiseQuadratic::substitute(
   result.C << (a * K * K + b + c * K),      // y^2
       (2 * a * K * k + c * k + d * K + e),  // y
       (a * k * k + d * k + f);              // 1
+
+  // ax+by=c
+  // y = (c-ax) / b
+  result.xc << (conditional(2) - conditional(0) * xc().array()) /
+                   conditional(1);
 
   return result;
 }
@@ -652,8 +698,8 @@ PiecewiseQuadratic PiecewiseQuadratic::swapXy(const PiecewiseQuadratic& src) {
 
 PiecewiseQuadratic PiecewiseQuadratic::rekey(const KeyVector& src_keys,
                                              const KeyVector& dest_keys) const {
-  assertm((dest_keys.size() == 2) || (dest_keys.size() == 1),
-          "dest_keys must be 1 or 2-dimensional");
+  // assertm((dest_keys.size() == 2) || (dest_keys.size() == 1),
+  //         "dest_keys must be 1 or 2-dimensional");
   assertm((src_keys.size() == 2) || (src_keys.size() == 1),
           "src_keys must be 1 or 2-dimensional");
 

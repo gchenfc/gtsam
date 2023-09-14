@@ -169,6 +169,32 @@ TEST(PiecewiseQuadratic, substitute) {
 }
 
 /* ************************************************************************* */
+TEST(PiecewiseQuadratic, substituteEquality3vars) {
+  PiecewiseQuadratic q(1.3, 2.1, 3.6, 4.3, 5.2, 6.4);
+
+  Vector4 equation{2, 3, 4, 5};
+
+  PiecewiseQuadratic q_of_y = q.substitute(equation);
+
+  // Now check that q_of_y(y) evaluates to the same as q(x_of_y(y), y)
+  auto test_with_y = [&](double y, double z) {
+    auto x = (equation(3) - equation(1) * y - equation(2) * z) / equation(0);
+    auto expected = q.evaluate(x, y);
+    // std::cout << "Trying " << y << "\tx = " << x
+    //           << "\texpected = " << expected << std::endl;
+    auto actual = q_of_y.evaluate(y, z);
+    EXPECT_DOUBLES_EQUAL(expected, actual, 1e-9);
+  };
+
+  std::vector<double> grid{-10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10};
+  for (auto y : grid) {
+    for (auto z : grid) {
+      test_with_y(y, z);
+    }
+  }
+}
+
+/* ************************************************************************* */
 TEST(PiecewiseQuadratic, solve_parametric) {
   // See Qp2d_example.ipynb
   // z1: [0.5, 3, 0, 0.5, -0.6, 0.155]

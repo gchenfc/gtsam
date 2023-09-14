@@ -137,7 +137,8 @@ void sortInequalitiesCw(const Inequalities& inequalities, int start_index,
       cur_index = next_index;
     }
   }
-  if (findCcwIntersection(inequalities, cur_index, false) != end_index) {
+  int sanity_check_index = findCcwIntersection(inequalities, cur_index, false);
+  if ((sanity_check_index != end_index) && (sanity_check_index != -1)) {
     throw std::runtime_error("Not enough space allocated");
   }
   // No resizing needed
@@ -146,6 +147,11 @@ void sortInequalitiesCw(const Inequalities& inequalities, int start_index,
 bool sortBoundaries(const Inequalities& inequalities, Inequalities& result) {
   if (inequalities.rows() <= 2) {
     result = inequalities;
+    // If the 2 inequalities are negative of eachother, then the feasible region
+    // is empty (a single line)
+    if (((result.row(0) + result.row(1)).array().abs() < 1e-9).all()) {
+      return false;
+    }
     return true;
   }
 
@@ -166,8 +172,8 @@ bool sortBoundaries(const Inequalities& inequalities, Inequalities& result) {
 
   // Now loop over the rest of the edges
   for (int index = 1; index < inequalities.rows(); ++index) {
-    most_recent_added = findCcwIntersection(inequalities, most_recent_added);
-    if (most_recent_added == -1) {
+    int to_add = findCcwIntersection(inequalities, most_recent_added);
+    if (to_add == -1) {
       // The feasible region is open, so we need to go cw starting from
       // start_index
       Inequalities cw(inequalities.rows() - (index + 1), 3);
@@ -178,14 +184,15 @@ bool sortBoundaries(const Inequalities& inequalities, Inequalities& result) {
       }
       result.conservativeResize(index + 1 + cw.rows(), Eigen::NoChange);
       return true;
-    } else if (most_recent_added == start_index) {
+    } else if (to_add == start_index) {
       // We've looped back to the start, so we're done
       result.conservativeResize(index + 1, Eigen::NoChange);
       return true;
     } else {
       // Insert the new inequality and move on
-      result.row(index + 1) = inequalities.row(most_recent_added);
+      result.row(index + 1) = inequalities.row(to_add);
     }
+    most_recent_added = to_add;
   }
 
   return false;  // infeasible
@@ -277,7 +284,8 @@ Eigen::Array<double, Eigen::Dynamic, 2> computeAllIntersections(
 /// @brief Computes the indices of the feasible points
 std::pair<int, int> computeFeasiblePointPair(
     const Inequalities& inequalities,
-    const Eigen::Array<double, Eigen::Dynamic, 2>& intersections, double tol) {
+    const Eigen::Array<double, Eigen::Dynamic, 2>& intersections,
+    const Inequality& line, double tol) {
   const auto &A = inequalities.col(0).array(), &B = inequalities.col(1).array(),
              &C = inequalities.col(2).array();
   const auto& xs = intersections.col(0);
@@ -289,22 +297,30 @@ std::pair<int, int> computeFeasiblePointPair(
   Eigen::ArrayXd rhs = (C + tol).matrix();
   const auto& is_feasibles = ((lhs.colwise() - rhs) <= 0).colwise().all();
 
+  double xt = line(1), yt = -line(0);
+  auto is_upper = [&xt, &yt](const auto& inequality) {
+    if (std::abs(inequality(0)) < 1e-9) return (inequality(1) > 0);
+    double line_dot_ineq = xt * inequality(0) + yt * inequality(1);
+    // if they are in the same direction and yt is positive, then upper bound
+    return (line_dot_ineq > 0) == (yt > 0);
+  };
+
   // Separate out lower vs upper intersection
   int lower_intersection = -1, upper_intersection = -1;
   for (int i = 0; i < is_feasibles.size(); ++i) {
     if (is_feasibles(i)) {
-      if (B(i) > 0) {  // upper bound
+      if (is_upper(inequalities.row(i))) {  // upper bound
         if (upper_intersection != -1) {
-          if ((xs(i) != xs(upper_intersection)) ||
-              (ys(i) != ys(upper_intersection))) {
+          if ((std::abs(xs(i) - xs(upper_intersection)) > 1e-9) ||
+              (std::abs(ys(i) - ys(upper_intersection)) > 1e-9)) {
             assertm(false, "Multiple distinct upper intersections");
           }
         }
         upper_intersection = i;
       } else {
         if (lower_intersection != -1) {
-          if ((xs(i) != xs(lower_intersection)) ||
-              (ys(i) != ys(lower_intersection))) {
+          if ((std::abs(xs(i) - xs(lower_intersection)) > 1e-9) ||
+              (std::abs(ys(i) - ys(lower_intersection)) > 1e-9)) {
             assertm(false, "Multiple distinct lower intersections");
           }
         }

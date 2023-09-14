@@ -177,8 +177,23 @@ class PiecewiseQuadratic {
   /// Substitute a linear solution x^*(y) into the quadratic to obtain
   /// a new piecewise quadratic on y (one variable, so b, c, e = 0).
   /// conditional should take the form ax + by = c
-  PiecewiseQuadratic1d substitute(
+  PiecewiseQuadratic1d substituteEq1(
       const LinearConstraint::Linear& conditional) const;
+
+  /// Substitute a linear solution x^*(y, z) into the quadratic to obtain
+  /// a new piecewise quadratic on y and z
+  /// conditional should take the form ax + by + cz = d
+  PiecewiseQuadratic substituteEq2(
+      const LinearConstraint::Linear& conditional) const;
+
+  /// Substitute a linear solution into the quadratic to obtain a new piecewise
+  /// quadratic on the separator
+  PiecewiseQuadratic substitute(
+      const LinearConstraint::Linear& conditional) const {
+    if (conditional.cols() == 3) return substituteEq1(conditional);
+    if (conditional.cols() == 4) return substituteEq2(conditional);
+    throw std::runtime_error("Separator should be 1 or 2 variables");
+  }
 
   /// Substitute a value for y into the quadratic to obtain a new piecewise
   /// quadratic on y (one variable, so b, c, e = 0)

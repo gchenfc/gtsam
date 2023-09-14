@@ -276,34 +276,35 @@ TEST(eliminate, eliminate_control_limited_dynamics) {
 /* ************************************************************************* */
 TEST(eliminate, eliminate_quadratic_objectives) {
   // System Dynamics:
-  //    x_{k+1} = 0.98 * x_k + 0.5 * u_k
-  //    x_0 = 1.0
-  //    ~~x_1 <= 0.3
-  //    u_k + x_k <= 0.1
+  //    x_{k+1} = x_k + 0.1 * u_k
+  //    x_0 = 0.0
+  //    u_k <= 0.15
+  //    min (x-1)^2 + u^2
   //
   // Expect solution to be:
-  //    x0 = 1.0, u0 = -1.36  // So that x1 = 0.3
-  //    x1 = 0.3, u1 = -0.2
-  //    x2 = 0.194, u2 = -0.094
-  //    x3 = 0.14312, u3 = -0.04312
-  //    ...
-  //    xinf = 0.1 / 1.04 = 0.09615384615, uinf = -0.00384615385
+  //    ride along u = 0.15 until x46 (0.69)
+  //    Reduce u, because LQR says the tradeoff between u and x diminishes here
+  //    As a rough estimate, grad(f) = 0 = 2x*(0.1)du + 2x.dx + 2x.dx + 2u.du
+  //                         the minimum occurs when grad(f)=0 for any du, dx
+  //                                   u = -2.1x
+  //                                at -2.1 * 0.15 = -0.315 which is approx 0.69
 
-  static constexpr int N = 30;
+  static constexpr int N = 52;
 
   RetimingFactorGraph factors;
   for (int i = 0; i < N; ++i) {
     factors.push_back(RetimingFactor::Objective(
-        {X(i)}, PiecewiseQuadratic(1, 0, 0, -0.6, 0, 0)));
+        {X(i), U(i)}, PiecewiseQuadratic(1, 1, 0, -2, 0, 1)));  // (x-1)^2 + u^2
     factors.push_back(RetimingFactor::Equality(
-        {X(i + 1), X(i), U(i)}, LinConstr({-1.0, 0.98, 0.5}, 0.0)));
+        {X(i + 1), X(i), U(i)}, LinConstr({-1.0, 1.0, 0.1}, 0.0)));
+    factors.push_back(RetimingFactor::Inequality({U(i)}, LinConstr({1}, 0.15)));
     factors.push_back(
-        RetimingFactor::Inequality({U(i), X(i)}, LinConstr({1, 1}, 0.1)));
+        RetimingFactor::Inequality({U(i)}, LinConstr({-1}, 0.15)));
   }
-  factors.push_back(RetimingFactor::Equality({X(0)}, LinConstr({1}, 1.0)));
-  factors.push_back(RetimingFactor::Inequality({X(8)}, LinConstr({1}, -0.25)));
-
-  std::cout << "THIS IS THE REAL TEST ***************************" << std::endl;
+  factors.push_back(RetimingFactor::Objective(
+      {X(N)}, PiecewiseQuadratic(1, 0, 0, -2, 0, 1)));  // (x-1)^2
+  factors.push_back(RetimingFactor::Equality({X(0)}, LinConstr({1}, 0.0)));
+  // factors.push_back(RetimingFactor::Inequality({X(50)}, LinConstr({1}, .4)));
 
   Ordering ordering;
   for (int i = 0; i < N; ++i) {
@@ -320,20 +321,23 @@ TEST(eliminate, eliminate_quadratic_objectives) {
   auto sol1 = bn1->optimize();
 
   // Print Solution nicely
-  auto printSol = [](const ScalarValues& sol) {
-    for (int i = 0; i < N; ++i) {
-      std::cout << "\tx" << i << " = " << sol.at(X(i)) << ", u" << i << " = "
-                << sol.at(U(i)) << "\n";
-    }
-    std::cout << "\txN = " << sol.at(X(N)) << "\n";
-  };
+  // auto printSol = [](const ScalarValues& sol) {
+  //   for (int i = 0; i < N; ++i) {
+  //     std::cout << "\tx" << i << " = " << sol.at(X(i)) << ", u" << i << " = "
+  //               << sol.at(U(i)) << "\n";
+  //   }
+  //   std::cout << "\txN = " << sol.at(X(N)) << "\n";
+  // };
   // bn->print("Bayes Net:");
   // traits<ScalarValues>::Print(sol, "SOLUTION:");
   // printSol(sol);
   // bn1->print("Bayes Net:");
-  traits<ScalarValues>::Print(sol1, "SOLUTION:");
-  printSol(sol1);
+  // printSol(sol1);
 
+  EXPECT_DOUBLES_EQUAL(0.0, sol1.at(X(0)), 1e-9);
+  for (int k = 0; k < 47; ++k) EXPECT_DOUBLES_EQUAL(0.15, sol1.at(U(k)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.69, sol1.at(X(46)), 1e-9);
+  EXPECT_DOUBLES_EQUAL(0.740563, sol1.at(X(N)), 1e-6);
 }
 
 /* ************************************************************************* */

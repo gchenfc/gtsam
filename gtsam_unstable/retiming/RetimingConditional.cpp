@@ -42,6 +42,10 @@ double solveInequalitiesGreedily(const Linears& inequalities,
 
 double solveInequalityQuadratic1d(const PiecewiseQuadratic1d& objective,
                                   double xmin, double xmax) {
+#if PRINT_VERBOSITY > 45
+  traits<PiecewiseQuadratic1d>::Print(objective,
+                                      "Solving Inequality Quadratic for ");
+#endif
   const auto& xc = objective.xc;
   const auto& C = objective.C;
   auto start_index =
@@ -142,7 +146,9 @@ double solveInequalityQuadratic(
     if (row(0) == 1) xmax = std::min(xmax, row(1));
     if (row(0) == -1) xmin = -std::max(xmin, row(1));
   }
+#if PRINT_VERBOSITY > 45
   printf("  Bounds is (%f, %f)\n", xmin, xmax);
+#endif
   return solveInequalityQuadratic1d(obj, xmin, xmax);
 }
 
@@ -182,8 +188,9 @@ double solveUnconditionalQuadratic(const PiecewiseQuadratic& objective,
 /******************************************************************************/
 
 double RetimingConditional::solve(const ScalarValues& parents) {
-  // this->print("Calling solve on ");
+#if PRINT_VERBOSITY > 5
   traits<KeyVector>::Print(this->keys(), "Calling solve on");
+#endif
   double result = [&]() -> double {
     if (equalities().size()) {
       return solveEqualities(equalities(), keys(), parents);
@@ -201,7 +208,9 @@ double RetimingConditional::solve(const ScalarValues& parents) {
       return -std::numeric_limits<double>::infinity();
     }
   }();
+#if PRINT_VERBOSITY > 5
   std::cout << "  Returning " << result << std::endl;
+#endif
   return result;
 }
 

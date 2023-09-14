@@ -14,12 +14,30 @@ using Linears = LinearConstraint::Linears;
 
 /******************************************************************************/
 
+inline std::pair<std::shared_ptr<RetimingConditional>,
+                 std::shared_ptr<RetimingFactor>>
+EliminateRetiming_(const RetimingFactorGraph& factors, const Ordering& keys);
+
 std::pair<std::shared_ptr<RetimingConditional>, std::shared_ptr<RetimingFactor>>
 EliminateRetiming(const RetimingFactorGraph& factors, const Ordering& keys) {
+  auto [conditional, joint] = EliminateRetiming_(factors, keys);
+#if PRINT_VERBOSITY > 15
+  if (joint) joint->print("Passing on joint:");
+#endif
+  return {conditional, joint};
+}
+
+inline std::pair<std::shared_ptr<RetimingConditional>,
+                 std::shared_ptr<RetimingFactor>>
+EliminateRetiming_(const RetimingFactorGraph& factors, const Ordering& keys) {
   if (keys.size() != 1) {
     throw std::runtime_error("Multi-key elimination not Implemented");
   }
   const auto& key = keys.at(0);
+
+#if PRINT_VERBOSITY > 10
+  printf("Eliminating key %s", DefaultKeyFormatter(key).c_str());
+#endif
 
   // Create an ordering with the key at the front.  We could use the functions
   // in Ordering.h but that's overkill since we only care about the first key
@@ -50,6 +68,9 @@ EliminateRetiming(const RetimingFactorGraph& factors, const Ordering& keys) {
     // Gauss-Jordan elimination on the first column
     for (int r = 0; r < equalities.rows(); ++r) {
       if (equalities(r, col_index) != 0) {
+#if PRINT_VERBOSITY > 10
+        printf("Eliminating with equality!!!\n");
+#endif
         const LinearConstraint::Linear equality =
             equalities.row(r) / equalities(r, col_index);
         // Remove equality from factor, since it's now redundant
@@ -115,11 +136,20 @@ GTSAM_EXPORT std::pair<std::shared_ptr<RetimingConditional>,
 EliminateQp2d(const RetimingFactor& factor, KeyVector& keys) {
   // static constexpr int col_index = 0;
 
+#if PRINT_VERBOSITY > 40
+  factor.print("EliminateQp2d, input is: ");
+#endif
+
   PiecewiseQuadratic objective{factor.objectives()};
+
   const auto [/*PiecewiseQuadratic*/ new_objective,
               /*Inequalities*/ new_constraint] =
       objective.solveParametric(factor.inequalities());
-  // const auto new_objective = objective.substitute(conditional);
+
+#if PRINT_VERBOSITY > 32
+  new_objective.print("EliminateQp2d: New objective!!!");
+  std::cout << "New constraint!" << new_constraint << std::endl;
+#endif
 
   // Even though we computed conditional, gtsam conditionals must derive from
   // factor (makes sense) but this will be prickly so let's just use the

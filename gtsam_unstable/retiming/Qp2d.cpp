@@ -68,11 +68,12 @@ PiecewiseQuadratic1d min(const PiecewiseQuadratic& objective,
   for (int i = 0; i < objective.xc().size(); ++i) {
     double x_max = objective.xc()(i);
     if (x_min == x_max) continue;
-    insert_x_lims(x_min, x_max);
+    if (!insert_x_lims(x_min, x_max)) continue;  // infeasible
     const auto& sol2 = min(objective.C().row(i), ineqs_with_x_limits_sorted);
     PiecewiseQuadratic1d::MinInPlace(sol, sol2);
     x_min = x_max;
   }
+
   if ((sol.xc.size() == 0) && (sol.C.size() == 0)) {
     objective.print("Encountered infeasible problem!  Called with objective:");
     std::cout << "Inequalities:\n"
@@ -132,6 +133,7 @@ void computeObjectiveAlongBoundary(const Inequalities& inequalities,
   } else {
     xc.emplace_back(
         lp2d::nextVertexFromSorted(inequalities, start_edge, ccw != to_max)(1));
+    if (std::abs(xc.back() - y_at_intersection) < 1e-9) return;
   }
 
   // Add middle objectives & vertices
@@ -143,7 +145,6 @@ void computeObjectiveAlongBoundary(const Inequalities& inequalities,
     double m_ = -B(i) / A(i), b_ = C(i) / A(i);
     auto next_vertex =
         lp2d::nextVertexFromSorted(inequalities, i, ccw == to_max)(1);
-    printf("next vertex: %f, last vertex: %f\n", next_vertex, xc.back());
     if (next_vertex == xc.back()) continue;
     qs.emplace_back(::gtsam::internal::substitute(objective, m_, b_));
     xc.emplace_back(next_vertex);
@@ -162,7 +163,7 @@ void computeObjectiveAlongBoundary(const Inequalities& inequalities,
   }
 
   // Check if the last 2 are redundant
-  if ((xc.size() >= 2) && (xc.back() == xc.at(xc.size() - 2))) {
+  if ((xc.size() >= 2) && (std::abs(xc.back() - xc.at(xc.size() - 2)) < 1e-9)) {
     xc.pop_back();
     qs.pop_back();
   }
@@ -182,19 +183,44 @@ std::pair<double, double> gradient(const Eigen::Ref<const Quadratic>& objective,
 
 PiecewiseQuadratic1d min(const Eigen::Ref<const Quadratic>& objective,
                          const Inequalities& inequalities) {
+  // std::cout << "Called min with objective: " << objective << std::endl;
+  // std::cout << "Called min with inequalities:\n" << inequalities <<
+  // std::endl;
+
   // Solution to return
   std::vector<Eigen::Matrix<double, 1, 3>> qs;
   std::vector<double> xc;
 
   // First compute the unconstrained solution
-  //  x'* = -(c.y + d) / (2a)
-  //  x'* = (-c/(2a)) * y + (-d / (2a)) = m.y + b
-  const auto &a = objective(0), &c = objective(2), &d = objective(3);
-  if (std::abs(a) < 1e-9) {
-    throw std::runtime_error("TODO: switch to LP");
+  double m, b;
+  const auto &a = objective(0), &b_ = objective(1), &c = objective(2),
+             &d = objective(3), &e = objective(4), &f = objective(5);
+  {
+    if (std::abs(a) > 1e-9) {  // quadratic in x
+      // Quadratic achieves minimum at -b/2a
+      //  x'* = -(c.y + d) / (2a)
+      //  x'* = (-c/(2a)) * y + (-d / (2a)) = m.y + b
+      // or use grad_x = 2ax + cy + d = 0
+      m = -c / (2 * a);
+      b = -d / (2 * a);
+    } else if (std::abs(b_) > 1e-9) {  // quadratic in y
+      // grad_y = 2by + cx + e = 0
+      // x = -(2b/c).y - (e/c)
+      m = -2 * b_ / c;
+      b = -e / c;
+    } else if ((std::abs(c) > 1e-9) || (std::abs(d) > 1e-9) ||
+               (std::abs(e) > 1e-9)) {
+      throw std::runtime_error("TODO: switch to LP");
+    } else {
+      // Trivial case of a constant
+      auto [y_min, y_max] =
+          LinearConstraint::scalarBoundsToPair(lp2d::extremalsY(inequalities));
+      return PiecewiseQuadratic1d{
+          .C = (Eigen::Matrix<double, Eigen::Dynamic, 3>(1, 3) << 0, 0, f)
+                   .finished(),
+          .xc = Eigen::Vector2d{y_min, y_max}};
+    }
   }
-  double m = -c / (2 * a);
-  double b = -d / (2 * a);
 
   // Now find where the unconstrained solution intersects the inequalities
   //    Inequalities of the form Ax + By <= C
@@ -205,10 +231,7 @@ PiecewiseQuadratic1d min(const Eigen::Ref<const Quadratic>& objective,
   const auto& ys = xys.col(1).array();
 
   const auto [lower_intersection, upper_intersection] =
-      lp2d::computeFeasiblePointPair(inequalities, xys);
-
-  printf("The active inequalities are %d %d\n", lower_intersection,
-         upper_intersection);
+      lp2d::computeFeasiblePointPair(inequalities, xys, {2 * a, c, -d});
 
   if ((lower_intersection == -1) && (upper_intersection == -1)) {
     // Could either be unbounded or doesn't intersect with the polygon at all
@@ -243,7 +266,9 @@ PiecewiseQuadratic1d min(const Eigen::Ref<const Quadratic>& objective,
                                       qs, xc);
       }
       auto ret = PiecewiseQuadratic1d::Create(qs, xc);
-      ret.print("Detected lack of intersection.  Returning: ");
+#if PRINT_VERBOSITY > 40
+      ret.print("Detected lack of intersection.  Successfully returning: ");
+#endif
       return ret;
     }
   }
