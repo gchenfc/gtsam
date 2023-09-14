@@ -193,7 +193,26 @@ struct WithIndent {
   friend std::ostream& operator<<(std::ostream& os, const WithIndent& obj) {
     for (const auto& row : obj.mat.rowwise()) {
       os << obj.indent;
-      for (const auto& e : row) os << std::setw(obj.width) << e;
+      for (const auto& e : row) os << std::setw(obj.width) << e << " ";
+      os << std::endl;
+    }
+    return os;
+  }
+};
+
+template <typename MatrixType>
+struct WithIndent<std::vector<MatrixType>> {
+  const std::vector<MatrixType>& mat;
+  const std::string& indent;
+  int width;
+  WithIndent(const std::vector<MatrixType>& mat,
+             const std::string& indent = "\t", int width = 10)
+      : mat(mat), indent(indent), width(width) {}
+
+  friend std::ostream& operator<<(std::ostream& os, const WithIndent& obj) {
+    for (const auto& row : obj.mat) {
+      os << obj.indent;
+      for (const auto& e : row) os << std::setw(obj.width) << e << " ";
       os << std::endl;
     }
     return os;
