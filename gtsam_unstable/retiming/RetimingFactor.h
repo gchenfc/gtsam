@@ -28,6 +28,8 @@ class GTSAM_EXPORT RetimingFactor : public Factor {
   using Linears = LinearConstraint::Linears;
 
   // Constructors
+  RetimingFactor() : Factor() {}
+
   RetimingFactor(const KeyVector& keys, const RetimingObjectives& objectives,
                  const Linears& equality, const Linears& inequality,
                  bool removeRedundantConstraints = true,

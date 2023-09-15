@@ -102,7 +102,7 @@ inline void RunSystem(int N = 100000, bool use_objectives = false,
 }
 
 int main() {
-  for (int N = 1000; N <= 10000; N += 1000) {
+  for (int N = 1000; N <= 50000; N += 1000) {
     std::cout << "Running with N = " << N << std::endl;
     RunSystem(N);
   }

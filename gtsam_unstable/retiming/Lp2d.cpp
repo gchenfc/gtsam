@@ -4,10 +4,43 @@
 
 #include "assert.h"
 
+#ifdef USE_TOPPRA_LP2D
+// I tried theirs, and it's no faster
+// Add these lines to gtsam_unstable/CMakeLists.txt:
+//  find_package(toppra)
+//  target_link_libraries(gtsam_unstable PUBLIC toppra::toppra)
+#include <toppra/solver/seidel-internal.hpp>
+using namespace toppra::solver;
+#endif // USE_TOPPRA_LP2D
+
 namespace gtsam {
 namespace lp2d {
 
 /******************************************************************************/
+
+#ifdef USE_TOPPRA_LP2D
+ScalarBounds extremalsY_(const Inequalities& inequalities) {
+  Seidel a;
+
+  MatrixX2 A_1d(inequalities.rows() + 4, 2);
+  Inequalities A(inequalities.rows(), 3);
+  A << inequalities.col(0), inequalities.col(1), -inequalities.col(2);
+
+  seidel::LpSol sol = seidel::solve_lp2d(
+      RowVector2{0, 1}, A, Vector2{-999, -999}, Vector2{999, 999}, A_1d);
+  assertm(sol.feasible, "Infeasible");
+  double max = sol.optvar(1);
+
+  sol = seidel::solve_lp2d(RowVector2{0, -1}, A, Vector2{-999, -999},
+                           Vector2{999, 999}, A_1d);
+  assertm(sol.feasible, "Infeasible");
+  double min = sol.optvar(1);
+
+  ScalarBounds bounds;
+  bounds << 1, max, -1, -min;
+  return bounds;
+}
+#endif // USE_TOPPRA_LP2D
 
 ScalarBounds extremalsY(const Inequalities& inequalities) {
   // TODO(gerry): Here's a simplex-like algorithm that might be more efficient:

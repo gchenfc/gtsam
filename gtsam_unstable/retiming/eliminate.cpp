@@ -52,18 +52,19 @@ EliminateRetiming_(const RetimingFactorGraph& factors, const Ordering& keys) {
   constexpr int col_index = 0;
 
   // Collect all the objectives/constraints into a single factor
-  RetimingFactor factor(factors, ordering);
+  auto factor = std::make_shared<RetimingFactor>(factors, ordering);
 
   // First the trivial case
   if (ordering.size() == 1) {
-    RetimingFactor::normalizeEqualitiesInplace(factor.equalities());
-    RetimingFactor::normalizeInequalitiesInplace(factor.inequalities());
-    return {/*Conditional*/ std::make_shared<RetimingConditional>(factor),
-            /*   Joint   */ nullptr};
+    RetimingFactor::normalizeEqualitiesInplace(factor->equalities());
+    RetimingFactor::normalizeInequalitiesInplace(factor->inequalities());
+    return {
+        /*Conditional*/ std::static_pointer_cast<RetimingConditional>(factor),
+        /*   Joint   */ std::make_shared<RetimingFactor>()};
   }
 
   // Second check if there are any equalities that can be used for elimination
-  const auto& equalities = factor.equalities();
+  const auto& equalities = factor->equalities();
   if (equalities.leftCols<1>().any()) {
     // Gauss-Jordan elimination on the first column
     for (int r = 0; r < equalities.rows(); ++r) {
@@ -74,25 +75,25 @@ EliminateRetiming_(const RetimingFactorGraph& factors, const Ordering& keys) {
         const LinearConstraint::Linear equality =
             equalities.row(r) / equalities(r, col_index);
         // Remove equality from factor, since it's now redundant
-        factor.equalities() = LinearConstraint::dropRow(equalities, r);
-        return {/*Conditional*/ RetimingConditional::Equality(factor.keys(),
+        factor->equalities() = LinearConstraint::dropRow(equalities, r);
+        return {/*Conditional*/ RetimingConditional::Equality(factor->keys(),
                                                               equality),
-                /*   Joint   */ factor.substitute(col_index, equality)};
+                /*   Joint   */ factor->substitute(col_index, equality)};
       }
     }
   }
 
   // Third, check for 2-variable inequalities
   if (ordering.size() == 2) {
-    return AllObjectivesGreedy(factor.objectives())
+    return AllObjectivesGreedy(factor->objectives())
                ? EliminateLp2d(factor, ordering)
                : EliminateQp2d(factor, ordering);
   }
   // Or check if there are more than 2 variables, but only 2 have inequalities
   // (edge case)
-  const auto& Ab = factor.inequalities();
+  const auto& Ab = factor->inequalities();
   if (Ab.leftCols(Ab.cols() - 1).colwise().any().sum() <= 2) {
-    return EliminateManyVars2Inequalities(factor, ordering);
+    return EliminateManyVars2Inequalities(*factor, ordering);
   }
 
   // Otherwise, the rest of the cases are not implemented
@@ -117,16 +118,17 @@ bool AllObjectivesGreedy(const RetimingObjectives& objectives) {
 
 GTSAM_EXPORT std::pair<std::shared_ptr<RetimingConditional>,
                        std::shared_ptr<RetimingFactor>>
-EliminateLp2d(const RetimingFactor& factor, const KeyVector& ordering) {
+EliminateLp2d(const RetimingFactor::shared_ptr& factor,
+              const KeyVector& ordering) {
   static constexpr int col_index = 0;
-  assertm(AllObjectivesGreedy(factor.objectives()),
+  assertm(AllObjectivesGreedy(factor->objectives()),
           "Elimination with non-greedy objectives not yet implemented");
 
-  return {/*Conditional*/ std::make_shared<RetimingConditional>(factor),
+  return {/*Conditional*/ std::static_pointer_cast<RetimingConditional>(factor),
           /*   Joint   */ std::make_shared<RetimingFactor>(
-              KeyVector{ordering.back()}, factor.objectives(),
-              LinearConstraint::dropCol(factor.equalities(), col_index),
-              lp2d::extremalsY(factor.inequalities()))};
+              KeyVector{ordering.back()}, factor->objectives(),
+              LinearConstraint::dropCol(factor->equalities(), col_index),
+              lp2d::extremalsY(factor->inequalities()))};
 }
 
 /******************************************************************************/

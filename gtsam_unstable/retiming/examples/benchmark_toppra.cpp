@@ -152,7 +152,7 @@ void run(int N = 10000) {
 }
 
 int main() {
-  for (int N = 1000; N <= 30000; N += 1000) {
+  for (int N = 1000; N <= 50000; N += 1000) {
     std::cout << "Running with N = " << N << std::endl;
     run(N);
   }
