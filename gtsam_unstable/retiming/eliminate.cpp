@@ -135,18 +135,18 @@ EliminateLp2d(const RetimingFactor::shared_ptr& factor,
 
 GTSAM_EXPORT std::pair<std::shared_ptr<RetimingConditional>,
                        std::shared_ptr<RetimingFactor>>
-EliminateQp2d(const RetimingFactor& factor, KeyVector& keys) {
+EliminateQp2d(const RetimingFactor::shared_ptr& factor, KeyVector& keys) {
   // static constexpr int col_index = 0;
 
 #if PRINT_VERBOSITY > 40
-  factor.print("EliminateQp2d, input is: ");
+  factor->print("EliminateQp2d, input is: ");
 #endif
 
-  PiecewiseQuadratic objective{factor.objectives()};
+  PiecewiseQuadratic objective{factor->objectives()};
 
   const auto [/*PiecewiseQuadratic*/ new_objective,
               /*Inequalities*/ new_constraint] =
-      objective.solveParametric(factor.inequalities());
+      objective.solveParametric(factor->inequalities());
 
 #if PRINT_VERBOSITY > 32
   new_objective.print("EliminateQp2d: New objective!!!");
@@ -156,11 +156,11 @@ EliminateQp2d(const RetimingFactor& factor, KeyVector& keys) {
   // Even though we computed conditional, gtsam conditionals must derive from
   // factor (makes sense) but this will be prickly so let's just use the
   // original factor like with Lp2d
-  return {/*Conditional*/ std::make_shared<RetimingConditional>(factor),
+  return {/*Conditional*/ std::static_pointer_cast<RetimingConditional>(factor),
           /*   Joint   */ std::make_shared<RetimingFactor>(
               KeyVector{keys.back()},
               RetimingObjectives{RetimingObjective(new_objective)},
-              factor.equalities(), new_constraint)};
+              factor->equalities(), new_constraint)};
 }
 
 /******************************************************************************/

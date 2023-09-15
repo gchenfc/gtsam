@@ -44,7 +44,7 @@ EliminateManyVars2Inequalities(const RetimingFactor& factor, KeyVector& keys);
 /// quadratic objective
 GTSAM_EXPORT std::pair<std::shared_ptr<RetimingConditional>,
                        std::shared_ptr<RetimingFactor>>
-EliminateQp2d(const RetimingFactor& factor, KeyVector& keys);
+EliminateQp2d(const RetimingFactor::shared_ptr& factor, KeyVector& keys);
 
 }  // namespace elimination_helpers
 
