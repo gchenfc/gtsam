@@ -93,7 +93,7 @@ inline void RunSystem(bool with_objectives = true, bool print_sol = false) {
           {X(i)},
           PiecewiseQuadratic(PiecewiseQuadratic1d::Create({500 * q}, {})));
       factors += RetimingFactor::Objective({U(i), X(i)},
-                                           PiecewiseQuadratic(1 * r, {}));
+                                           PiecewiseQuadratic(200 * r, {}));
     }
   }
 
